@@ -1,0 +1,117 @@
+services:
+  # ========== MySQL Database ==========
+  mysql:
+    image: mysql:8.0
+    container_name: familytree-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: bao123@
+      MYSQL_DATABASE: treefamily
+      MYSQL_USER: familytree
+      MYSQL_PASSWORD: familytree123
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database:/docker-entrypoint-initdb.d
+    networks:
+      - familytree-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password --lower_case_table_names=1
+
+  # ========== Backend API ==========
+  backend:
+    build:
+      context: ./myFamilyTree
+      dockerfile: Dockerfile
+    container_name: familytree-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 6001
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: bao123@
+      DB_NAME: treefamily
+      JWT_SECRET: "thong tin cua gia dinh toi nhe 21"
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "6001:6001"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - familytree-network
+
+  # ========== API Gateway ==========
+  gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: familytree-gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      URL_CORE: http://backend:6001
+      URL_FIREWORK: http://backend:6001
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    networks:
+      - familytree-network
+
+  # ========== Frontend ==========
+  frontend:
+    build:
+      context: ./FE/tree
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
+    container_name: familytree-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+    networks:
+      - familytree-network
+
+  # ========== Nginx Reverse Proxy ==========
+  nginx:
+    image: nginx:alpine
+    container_name: familytree-nginx
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+      - "8443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - gateway
+    networks:
+      - familytree-network
+
+# ========== Volumes ==========
+volumes:
+  mysql_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+# ========== Networks ==========
+networks:
+  familytree-network:
+    driver: bridge
