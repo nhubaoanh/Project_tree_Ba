@@ -21,9 +21,6 @@ interface AIChatBoxProps {
 const QUICK_QUESTIONS = [
   "Có bao nhiêu người trong gia phả?",
   "Gia phả có bao nhiêu nam giới?",
-  "Danh sách người còn sống",
-  "Đời thứ 3 có bao nhiêu người?",
-  "Có bao nhiêu người đã kết hôn?",
 ];
 
 export function AIChatBox({ onClose, dongHoId }: AIChatBoxProps) {
