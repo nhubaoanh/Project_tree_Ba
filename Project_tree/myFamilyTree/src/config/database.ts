@@ -29,13 +29,20 @@ export class Database {
     try {
       connection = await this.pool.getConnection();
       const [results] = await connection.query(sql, values);
-      const [outParams] = await connection.query("SELECT @err_code, @err_msg");
-      let err: any = outParams;
-      if (err[0]["@err_code"] === 0) {
-        return results;
-      } else {
-        throw new Error(err[0]["@err_msg"]);
+
+      // Một số truy vấn (CALL stored procedure) dùng biến OUT @err_code/@err_msg.
+      // Với truy vấn SQL bình thường, các biến này sẽ không được set và trả về null.
+      const [outParams]: any = await connection.query("SELECT @err_code AS err_code, @err_msg AS err_msg");
+      const err: any = Array.isArray(outParams) ? outParams[0] : outParams;
+
+      if (err && typeof err.err_code !== "undefined" && err.err_code !== null) {
+        if (Number(err.err_code) === 0) {
+          return results;
+        }
+        throw new Error(err.err_msg || "Database returned an error");
       }
+
+      return results;
     } catch (error) {
       throw error;
     } finally {

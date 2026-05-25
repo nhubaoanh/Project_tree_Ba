@@ -117,3 +117,67 @@ export const searchThanhVienRules: ValidationChain[] = [
   optionalStringLength("dongHoId", "Dòng họ ID", 50),
   ...paginationRules,
 ];
+
+export const saveCoordinatesRules: ValidationChain[] = [
+  body("dongHoId")
+    .notEmpty()
+    .withMessage("Dòng họ ID không được để trống"),
+  body("coordinates")
+    .isArray({ min: 1 })
+    .withMessage("coordinates phải là một mảng chứa ít nhất một phần tử"),
+  body("coordinates.*.thanhVienId")
+    .isInt({ min: 1 })
+    .withMessage("thanhVienId phải là số nguyên dương"),
+  body("coordinates.*.toaDoX")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("toaDoX phải là một số"),
+  body("coordinates.*.toaDoY")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("toaDoY phải là một số"),
+];
+
+export const saveEdgeCoordinatesRules: ValidationChain[] = [
+  body("dongHoId")
+    .notEmpty()
+    .withMessage("Dòng họ ID không được để trống"),
+  body("edgeCoordinates")
+    .isArray({ min: 1 })
+    .withMessage("edgeCoordinates phải là một mảng chứa ít nhất một phần tử"),
+  body("edgeCoordinates.*.edgeId")
+    .notEmpty()
+    .withMessage("edgeId không được để trống"),
+  body("edgeCoordinates.*.bendX")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("bendX phải là một số"),
+  body("edgeCoordinates.*.bendY")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("bendY phải là một số"),
+  body("edgeCoordinates.*.dx")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("dx phải là một số"),
+  body("edgeCoordinates.*.dy")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("dy phải là một số"),
+  body("edgeCoordinates.*.cp1x")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("cp1x phải là một số"),
+  body("edgeCoordinates.*.cp1y")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("cp1y phải là một số"),
+  body("edgeCoordinates.*.cp2x")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("cp2x phải là một số"),
+  body("edgeCoordinates.*.cp2y")
+    .optional({ nullable: true })
+    .isFloat()
+    .withMessage("cp2y phải là một số"),
+];

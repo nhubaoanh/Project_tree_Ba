@@ -47,6 +47,36 @@ export class thanhVienService {
     return await this.thanhvienRespository.getAllByDongHo(dongHoId);
   }
 
+  async saveCoordinates(
+    dongHoId: string,
+    coordinates: Array<{ thanhVienId: number; toaDoX: number | null; toaDoY: number | null }>,
+    luUserId?: string
+  ): Promise<any> {
+    return await this.thanhvienRespository.saveCoordinates(dongHoId, coordinates, luUserId);
+  }
+
+  async saveEdgeCoordinates(
+    dongHoId: string,
+    edgeCoordinates: Array<{
+      edgeId: string;
+      bendX?: number | null;
+      bendY?: number | null;
+      dx?: number | null;
+      dy?: number | null;
+      cp1x?: number | null;
+      cp1y?: number | null;
+      cp2x?: number | null;
+      cp2y?: number | null;
+    }>,
+    luUserId?: string
+  ): Promise<any> {
+    return await this.thanhvienRespository.saveEdgeCoordinates(dongHoId, edgeCoordinates, luUserId);
+  }
+
+  async loadEdgeCoordinates(dongHoId: string): Promise<any> {
+    return await this.thanhvienRespository.loadEdgeCoordinates(dongHoId);
+  }
+
   // Search thành viên theo dòng họ cụ thể
   async searchThanhVienByDongHo(
     pageIndex: number,

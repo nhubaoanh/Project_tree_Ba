@@ -30,6 +30,8 @@ import {
   updateThanhVienRules,
   idParamRules,
   searchThanhVienRules,
+  saveCoordinatesRules,
+  saveEdgeCoordinatesRules,
 } from "../validators";
 
 const thanhVienRouter = Router();
@@ -167,6 +169,29 @@ thanhVienRouter.post(
   checkDongHoAccess,
   uploadLimiter,
   controller.importFromJson.bind(controller)
+);
+
+thanhVienRouter.post(
+  "/save-coordinates",
+  authenticate,
+  checkDongHoAccess,
+  validate(saveCoordinatesRules),
+  controller.saveCoordinates.bind(controller)
+);
+
+thanhVienRouter.post(
+  "/save-edge-coordinates",
+  authenticate,
+  checkDongHoAccess,
+  validate(saveEdgeCoordinatesRules),
+  controller.saveEdgeCoordinates.bind(controller)
+);
+
+thanhVienRouter.get(
+  "/load-edge-coordinates/:dongHoId",
+  authenticate,
+  checkDongHoAccess,
+  controller.loadEdgeCoordinates.bind(controller)
 );
 
 // ============================================================================

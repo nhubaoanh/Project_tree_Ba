@@ -18,6 +18,7 @@ export enum ViewMode {
   HISTORY = "history",
   SETTINGS = "settings",
   PHA_KY = "phaky",
+  CONTRIBUTIONS = "contributions",
   NEWS = "news",
   EVENT = "events",
 }

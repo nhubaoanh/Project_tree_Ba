@@ -9,6 +9,9 @@ export const config = {
   // Base URL for file uploads
   baseUrl: process.env.BASE_URL,
 
+  // Frontend base URL for redirects and payment callbacks
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+
   // Database configuration
   db: {
     host: process.env.DB_HOST,
@@ -38,4 +41,25 @@ export const config = {
   // API Keys
   groqApiKey: process.env.GROQ_API_KEY || "",
   geminiApiKey: process.env.GEMINI_API_KEY || "",
+  bankTransfer: {
+    vnpay: {
+      merchantCode: process.env.VNPAY_MERCHANT_CODE || "",
+      hashSecret: process.env.VNPAY_HASH_SECRET || "",
+      apiUrl: process.env.VNPAY_API_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
+      queryUrl: process.env.VNPAY_QUERY_URL || 'https://sandbox.vnpayment.vn/merchant_webapi/merchant_information',
+      webhookUrl: process.env.VNPAY_WEBHOOK_URL || `${process.env.BASE_URL}/webhook/vnpay`,
+      returnUrl: process.env.VNPAY_RETURN_URL || `${process.env.BASE_URL}/api-core/bank-transfer/vnpay-return`,
+      ipnUrl: process.env.VNPAY_IPN_URL || `${process.env.BASE_URL}/webhook/vnpay`,
+      isTestMode: process.env.VNPAY_TEST_MODE === 'true' || true,
+    },
+    momo: {
+      partnerCode: process.env.MOMO_PARTNER_CODE || "",
+      accessKey: process.env.MOMO_ACCESS_KEY || "",
+      secretKey: process.env.MOMO_SECRET_KEY || "",
+      momoUrl: process.env.MOMO_URL || "",
+      webhookUrl: process.env.MOMO_WEBHOOK_URL || "",
+      partnerName: process.env.MOMO_PARTNER_NAME || "Test",
+      storeId: process.env.MOMO_STORE_ID || "MomoTestStore",
+    }
+  },
 };
