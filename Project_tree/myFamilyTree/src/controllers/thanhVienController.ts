@@ -73,6 +73,81 @@ export class thanhVienController {
     }
   }
 
+  // Lưu tọa độ thành viên
+  async saveCoordinates(req: Request, res: Response): Promise<void> {
+    try {
+      const { dongHoId, coordinates } = req.body;
+
+      if (!dongHoId || !Array.isArray(coordinates) || coordinates.length === 0) {
+        res.status(400).json({
+          message: "Thiếu dongHoId hoặc coordinates",
+          success: false,
+        });
+        return;
+      }
+
+      const result = await this.thanhvienService.saveCoordinates(
+        dongHoId,
+        coordinates,
+        (req as any).user?.nguoiDungId
+      );
+
+      res.status(200).json({
+        message: "Lưu tọa độ thành viên thành công",
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      console.error('❌ [saveCoordinates] Error:', error.message);
+      res.status(500).json({ message: "Lưu tọa độ thất bại", success: false });
+    }
+  }
+
+  async saveEdgeCoordinates(req: Request, res: Response): Promise<void> {
+    try {
+      const { dongHoId, edgeCoordinates } = req.body;
+
+      if (!dongHoId || !Array.isArray(edgeCoordinates) || edgeCoordinates.length === 0) {
+        res.status(400).json({
+          message: "Thiếu dongHoId hoặc edgeCoordinates",
+          success: false,
+        });
+        return;
+      }
+
+      const result = await this.thanhvienService.saveEdgeCoordinates(
+        dongHoId,
+        edgeCoordinates,
+        (req as any).user?.nguoiDungId
+      );
+
+      res.status(200).json({
+        message: "Lưu tọa độ đường nối thành công",
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      console.error('❌ [saveEdgeCoordinates] Error:', error.message);
+      res.status(500).json({ message: "Lưu tọa độ đường nối thất bại", success: false });
+    }
+  }
+
+  async loadEdgeCoordinates(req: Request, res: Response): Promise<void> {
+    try {
+      const dongHoId = req.params.dongHoId || req.query.dongHoId || req.body.dongHoId;
+      if (!dongHoId) {
+        res.status(400).json({ message: "Thiếu dongHoId", success: false });
+        return;
+      }
+
+      const result = await this.thanhvienService.loadEdgeCoordinates(dongHoId);
+      res.status(200).json({ message: "Lấy tọa độ đường nối thành công", success: true, data: result });
+    } catch (error: any) {
+      console.error('❌ [loadEdgeCoordinates] Error:', error.message);
+      res.status(500).json({ message: "Lấy tọa độ đường nối thất bại", success: false });
+    }
+  }
+
   // Xóa thành viên - cần dongHoId
   async deleteThanhVien(req: Request, res: Response): Promise<void> {
     try {

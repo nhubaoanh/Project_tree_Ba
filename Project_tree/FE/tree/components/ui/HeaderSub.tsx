@@ -8,7 +8,7 @@ import storage from "@/utils/storage";
 
 
 interface HeaderProps {
-  activeView: string;
+  activeView: ViewMode;
   onNavigate: (view: ViewMode) => void;
 }
 
@@ -49,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
   const navItems = [
     { key: ViewMode.PHA_KY, label: "Phả Ký" },
     { key: ViewMode.DIAGRAM, label: "Phả Đồ" },
+    { key: ViewMode.CONTRIBUTIONS, label: "Đóng Quỹ" },
     { key: ViewMode.EVENT, label: "Sự Kiện" },
     { key: ViewMode.NEWS, label: "Tin Tức" },
   ];

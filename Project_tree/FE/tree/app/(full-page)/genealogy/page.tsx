@@ -1,16 +1,15 @@
 "use client";
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/ui/HeaderSub";
-import { MyFamilyTree } from "@/components/ui/tree";
+import FamilyTreeCanvasGiaPha from "@/components/ui/tree/treeCanvasGiaPha";
 import { ViewMode } from "@/types/familytree";
 import { Users, MessageCircle } from "lucide-react";
 import TinTucPage from "../news/page";
 import PhaKyPage from "../pen/page";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import ContributionsPage from "../contributions-member/page";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getMembersByDongHo } from "@/service/member.service";
-import { ITreeNode } from "@/types/tree";
-import { buildTree } from "@/utils/treeUtils";
 import SuKienPage from "../events/page";
 import storage from "@/utils/storage";
 import { AIChatBox } from "@/components/shared/AIChatBox";
@@ -28,8 +27,6 @@ function GenealogyLoading() {
 // Main content component that uses useSearchParams
 function GenealogyContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const [activeView, setActiveView] = useState<ViewMode>(ViewMode.PHA_KY);
   const [showAIChat, setShowAIChat] = useState(false);
   
@@ -71,25 +68,11 @@ function GenealogyContent() {
   // Đảm bảo data luôn là array và clean
   const rawData = membersQuery?.data?.data;
   const data = Array.isArray(rawData) ? rawData.filter(member => {
-    // Lọc ra những member có dữ liệu hợp lệ
     if (!member || typeof member !== 'object') return false;
-    if (!member.thanhVienId || typeof member.thanhVienId !== 'number' || Number.isNaN(member.thanhVienId)) return false;
+    const id = typeof member.thanhVienId === 'string' ? Number(member.thanhVienId) : member.thanhVienId;
+    if (!id || typeof id !== 'number' || Number.isNaN(id)) return false;
     return true;
   }) : [];
-
-  const treeData = useMemo<ITreeNode[]>(() => {
-    if (!data || data.length === 0) return [];
-    
-    try {
-      const result = buildTree(data);
-      console.log('Tree data built successfully:', result.length, 'nodes');
-      return result;
-    } catch (error) {
-      console.error('Error building tree:', error);
-      console.error('Raw data:', data);
-      return [];
-    }
-  }, [data]);
 
   // Không cần xử lý chọn dòng họ nữa
 
@@ -128,11 +111,10 @@ function GenealogyContent() {
                 <div className="flex items-center justify-center h-full">
                   <div className="text-[#8b5e3c]">Đang tải cây gia phả...</div>
                 </div>
-              ) : treeData.length > 0 ? (
-                <MyFamilyTree 
-                  data={treeData} 
+              ) : data.length > 0 ? (
+                <FamilyTreeCanvasGiaPha 
+                  data={data}
                   dongHoId={selectedDongHoId}
-                  queryClient={queryClient}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-[#8b5e3c]">
@@ -155,6 +137,12 @@ function GenealogyContent() {
           {activeView === ViewMode.EVENT && (
             <div className="w-full h-full overflow-y-auto mt-10">
               <SuKienPage />
+            </div>
+          )}
+
+          {activeView === ViewMode.CONTRIBUTIONS && (
+            <div className="w-full h-full overflow-y-auto mt-10">
+              <ContributionsPage />
             </div>
           )}
         </div>

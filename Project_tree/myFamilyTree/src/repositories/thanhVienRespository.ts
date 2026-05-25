@@ -86,6 +86,135 @@ export class thanhVienRespository {
     }
   }
 
+  async saveCoordinates(
+    dongHoId: string,
+    coordinates: Array<{ thanhVienId: number; toaDoX?: number | null; toaDoY?: number | null }>,
+    luUserId?: string
+  ): Promise<any> {
+    if (!coordinates || coordinates.length === 0) {
+      return { success: true, updated: 0 };
+    }
+
+    const connection = await this.db.getRawConnection();
+    try {
+      await connection.beginTransaction();
+
+      const updateSql = `
+        UPDATE thanhvien
+        SET toaDoX = ?,
+            toaDoY = ?,
+            updatedCoordinates = NOW(),
+            lu_user_id = ?
+        WHERE dongHoId = ? AND thanhVienId = ?
+      `;
+
+      for (const item of coordinates) {
+        if (!item || typeof item.thanhVienId !== "number") {
+          throw new Error("Mỗi coordinate phải chứa thanhVienId hợp lệ");
+        }
+
+        await connection.query(updateSql, [
+          item.toaDoX ?? null,
+          item.toaDoY ?? null,
+          luUserId || null,
+          dongHoId,
+          item.thanhVienId,
+        ]);
+      }
+
+      await connection.commit();
+      return { success: true, updated: coordinates.length };
+    } catch (error: any) {
+      await connection.rollback();
+      console.error("❌ [saveCoordinates] Database error:", error.message);
+      throw new Error(error.message);
+    } finally {
+      connection.release();
+    }
+  }
+
+  async saveEdgeCoordinates(
+    dongHoId: string,
+    edgeCoordinates: Array<{
+      edgeId: string;
+      bendX?: number | null;
+      bendY?: number | null;
+      dx?: number | null;
+      dy?: number | null;
+      cp1x?: number | null;
+      cp1y?: number | null;
+      cp2x?: number | null;
+      cp2y?: number | null;
+    }>,
+    luUserId?: string
+  ): Promise<any> {
+    if (!edgeCoordinates || edgeCoordinates.length === 0) {
+      return { success: true, updated: 0 };
+    }
+
+    const connection = await this.db.getRawConnection();
+    try {
+      await connection.beginTransaction();
+
+      const insertSql = `
+        INSERT INTO edge_coordinates
+        (dongHoId, edgeId, bendX, bendY, dx, dy, cp1x, cp1y, cp2x, cp2y, lu_user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          bendX = VALUES(bendX),
+          bendY = VALUES(bendY),
+          dx = VALUES(dx),
+          dy = VALUES(dy),
+          cp1x = VALUES(cp1x),
+          cp1y = VALUES(cp1y),
+          cp2x = VALUES(cp2x),
+          cp2y = VALUES(cp2y),
+          lu_user_id = VALUES(lu_user_id),
+          active_flag = 1
+      `;
+
+      for (const item of edgeCoordinates) {
+        if (!item || !item.edgeId) {
+          throw new Error("Mỗi edgeCoordinate phải chứa edgeId");
+        }
+
+        await connection.query(insertSql, [
+          dongHoId,
+          item.edgeId,
+          item.bendX ?? null,
+          item.bendY ?? null,
+          item.dx ?? null,
+          item.dy ?? null,
+          item.cp1x ?? null,
+          item.cp1y ?? null,
+          item.cp2x ?? null,
+          item.cp2y ?? null,
+          luUserId || null,
+        ]);
+      }
+
+      await connection.commit();
+      return { success: true, updated: edgeCoordinates.length };
+    } catch (error: any) {
+      await connection.rollback();
+      console.error("❌ [saveEdgeCoordinates] Database error:", error.message);
+      throw new Error(error.message);
+    } finally {
+      connection.release();
+    }
+  }
+
+  async loadEdgeCoordinates(dongHoId: string): Promise<any> {
+    try {
+      const sql = `SELECT * FROM edge_coordinates WHERE dongHoId = ? AND active_flag = 1`;
+      const [rows] = await this.db.rawQuery(sql, [dongHoId]);
+      return Array.isArray(rows) ? rows : [];
+    } catch (error: any) {
+      console.error("❌ [loadEdgeCoordinates] Database error:", error.message);
+      throw new Error(error.message);
+    }
+  }
+
   // Lấy thành viên theo Composite Key (dongHoId + thanhVienId)
   async getThanhVienById(dongHoId: string, thanhVienId: number): Promise<any> {
     try {
