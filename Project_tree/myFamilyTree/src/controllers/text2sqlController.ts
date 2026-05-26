@@ -9,7 +9,14 @@
 import { Request, Response } from "express";
 import { Text2SQLService } from "../services/text2sqlService";
 
-const text2sqlService = new Text2SQLService();
+let text2sqlService: Text2SQLService | null = null;
+
+const getService = () => {
+  if (!text2sqlService) {
+    text2sqlService = new Text2SQLService();
+  }
+  return text2sqlService;
+};
 
 /**
  * POST /api-core/text2sql/query
@@ -38,7 +45,7 @@ export const queryText2SQL = async (req: Request, res: Response) => {
 
     // Xử lý câu hỏi
     console.log(`📥 Received question: "${question}" for dongHoId: ${dongHoId}`);
-    const result = await text2sqlService.processQuestion(question, dongHoId);
+    const result = await getService().processQuestion(question, dongHoId);
 
     return res.status(200).json({
       success: true,
@@ -61,7 +68,7 @@ export const queryText2SQL = async (req: Request, res: Response) => {
  */
 export const getExamples = async (req: Request, res: Response) => {
   try {
-    const examples = text2sqlService.getExamples();
+    const examples = getService().getExamples();
 
     return res.status(200).json({
       success: true,
@@ -88,13 +95,13 @@ export const getExamples = async (req: Request, res: Response) => {
  */
 export const reloadExamples = async (req: Request, res: Response) => {
   try {
-    text2sqlService.reloadExamples();
+    getService().reloadExamples();
 
     return res.status(200).json({
       success: true,
       message: "Reload examples thành công",
       data: {
-        total: text2sqlService.getExamples().length,
+        total: getService().getExamples().length,
       },
     });
   } catch (error: any) {
@@ -114,7 +121,7 @@ export const reloadExamples = async (req: Request, res: Response) => {
 export const healthCheck = async (req: Request, res: Response) => {
   try {
     const hasApiKey = !!process.env.GROQ_API_KEY;
-    const examplesCount = text2sqlService.getExamples().length;
+    const examplesCount = getService().getExamples().length;
 
     return res.status(200).json({
       success: true,

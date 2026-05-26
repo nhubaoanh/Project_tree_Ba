@@ -1,13 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { searchTinTuc, ITinTuc } from "@/service/tintuc.service";
 import storage from "@/utils/storage";
-import { X } from "lucide-react";
 
 export default function TinTucPage() {
+  const router = useRouter();
   const [dongHoId, setDongHoId] = useState<string>("");
-  const [selectedNews, setSelectedNews] = useState<ITinTuc | null>(null);
 
   useEffect(() => {
     const user = storage.getUser();
@@ -39,7 +39,7 @@ export default function TinTucPage() {
   // Component tin tức nhỏ dạng row
   const NewsRow = ({ item }: { item: ITinTuc }) => (
     <div
-      onClick={() => setSelectedNews(item)}
+      onClick={() => router.push(`/news/${item.tinTucId}`)}
       className="flex gap-3 p-2 cursor-pointer hover:bg-[#f5e6c8]/50 rounded-lg transition-all duration-300 group"
     >
       <div className="w-24 h-16 flex-shrink-0 overflow-hidden rounded-md border border-[#d4af37]/30">
@@ -63,50 +63,6 @@ export default function TinTucPage() {
     </div>
   );
 
-  // Modal chi tiết tin tức
-  const NewsModal = () => {
-    if (!selectedNews) return null;
-    return (
-      <div 
-        className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fadeIn" 
-        onClick={() => setSelectedNews(null)}
-      >
-        <div 
-          className="bg-[#fdf6e3] rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border-2 border-[#d4af37] animate-scaleIn" 
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="relative">
-            {selectedNews.anhDaiDien && (
-              <img 
-                src={selectedNews.anhDaiDien} 
-                alt={selectedNews.tieuDe} 
-                className="w-full h-64 object-cover rounded-t-2xl" 
-              />
-            )}
-            <button
-              onClick={() => setSelectedNews(null)}
-              className="absolute top-4 right-4 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-lg"
-            >
-              <X size={20} className="text-[#8b0000]" />
-            </button>
-          </div>
-          <div className="p-6 md:p-8">
-            <h2 className="font-serif text-2xl md:text-3xl font-bold text-[#8b0000] mb-4 leading-tight">
-              {selectedNews.tieuDe}
-            </h2>
-            <div className="flex items-center gap-4 text-sm text-[#8b5e3c] mb-6 pb-4 border-b border-[#d4af37]/30">
-              <span>Ngày đăng: {formatDate(selectedNews.ngayDang)}</span>
-              {selectedNews.tacGia && <span>Tác giả: {selectedNews.tacGia}</span>}
-            </div>
-            <div className="prose prose-stone max-w-none text-[#2d2d2d] leading-relaxed whitespace-pre-line font-serif">
-              {selectedNews.noiDung}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   if (tinTucQuery.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#fdf6e3]">
@@ -117,20 +73,6 @@ export default function TinTucPage() {
 
   return (
     <div className="min-h-screen py-8 px-4 font-serif text-[#4a4a4a] bg-[#fdf6e3]">
-      {/* CSS Animation */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.9); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
-        .animate-scaleIn { animation: scaleIn 0.3s ease-out; }
-      `}</style>
-
       <div className="max-w-6xl mx-auto">
         {allNewsItems.length === 0 ? (
           <div className="text-center py-20">
@@ -142,7 +84,7 @@ export default function TinTucPage() {
             {featuredNews && (
               <div 
                 className="flex flex-col md:flex-row gap-6 mb-10 cursor-pointer group"
-                onClick={() => setSelectedNews(featuredNews)}
+                onClick={() => router.push(`/news/${featuredNews.tinTucId}`)}
               >
                 {/* Hình ảnh bên trái */}
                 <div className="md:w-1/2 relative overflow-hidden rounded-xl border-2 border-[#d4af37]/50 shadow-lg">
@@ -220,8 +162,6 @@ export default function TinTucPage() {
           </>
         )}
       </div>
-
-      <NewsModal />
     </div>
   );
 }

@@ -20,4 +20,5 @@ export enum ViewMode {
   PHA_KY = "phaky",
   NEWS = "news",
   EVENT = "events",
+  Walet = "wallet",
 }

@@ -5,8 +5,6 @@ import ReactFlow, {
   Node,
   Edge,
   Background,
-  Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   NodeTypes,
@@ -25,80 +23,58 @@ import { PhotoNode } from "./tree/PhotoNode";
 import { FamilyMemberModal } from "./FamilyMemberModal";
 import { MemberCRUDModal } from "./tree/MemberCRUDModal";
 import { TreeControls } from "./tree/TreeControls";
-import { ContextMenu, CanvasContextMenu } from "./tree/ContextMenu";
-import { AdvancedSearch } from "./tree/AdvancedSearch";
+import { ContextMenu } from "./tree/ContextMenu";
 import { getLayoutedElements } from "./tree/layoutUtils";
-import { exportToPng, exportToSvg } from "./tree/exportUtils";
-import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { createMemberWithDongHo, updateMember, deleteMember } from "@/service/member.service";
+import { deleteMember } from "@/service/member.service";
 import { useToast } from "@/service/useToas";
 import storage from "@/utils/storage";
 
 interface Props {
   data: ITreeNode[];
   dongHoId?: string;
-  queryClient?: QueryClient; // Thêm queryClient để invalidate queries
-  onDataChange?: () => void; // Giữ lại để backward compatible
+  queryClient?: QueryClient;
+  onDataChange?: () => void;
 }
 
-const toNum = (v: unknown): number | undefined => {
-  if (v == null) return undefined;
-  const n = typeof v === "string" ? Number(v) : (v as number);
-  return Number.isFinite(n) ? n : undefined;
-};
-
 const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props) => {
+  // ===== React Flow Hooks =====
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
   const { showSuccess, showError } = useToast();
   
+  // ===== Modal States =====
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedNodeData, setSelectedNodeData] = useState<any>(null);
-  
-  const [maxGen, setMaxGen] = useState(3);
-  const [gens, setGens] = useState<number[]>([]);
-  const [direction, setDirection] = useState<"TB" | "BT" | "LR" | "RL">("TB");
-  const [search, setSearch] = useState("");
-  const [darkMode, setDarkMode] = useState(false);
-  const [layoutAlgorithm, setLayoutAlgorithm] = useState<"dagre" | "compact" | "spacious" | "balanced">("dagre");
-  const [nodeTemplate, setNodeTemplate] = useState<"default" | "compact" | "photo">("default");
-  const [showEdgeLabels, setShowEdgeLabels] = useState(true);
-
-  // CRUD Modal state
   const [crudModalOpen, setCrudModalOpen] = useState(false);
   const [crudMode, setCrudMode] = useState<"add" | "edit">("add");
   const [selectedMember, setSelectedMember] = useState<ITreeNode | null>(null);
+  
+  // ===== Tree Display States =====
+  const [maxGen, setMaxGen] = useState(3);
+  const [gens, setGens] = useState<number[]>([]);
+  const [direction] = useState<"TB" | "BT" | "LR" | "RL">("TB");
+  const [search, setSearch] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
+  const [layoutAlgorithm] = useState<"dagre" | "compact" | "spacious" | "balanced">("dagre");
+  const [nodeTemplate] = useState<"default" | "compact" | "photo">("default");
+  const [showEdgeLabels] = useState(true);
+  const [highlightedNodes, setHighlightedNodes] = useState<string[]>([]);
 
-  // Panel visibility
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
-
-  // Context menu state
+  // ===== Context Menu States =====
   const [contextMenu, setContextMenu] = useState<{
     id: string;
     top: number;
     left: number;
   } | null>(null);
-  const [canvasContextMenu, setCanvasContextMenu] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
 
-  // Highlighted nodes for search/relationship
-  const [highlightedNodes, setHighlightedNodes] = useState<string[]>([]);
-
-  // Undo/Redo
-  const { undo, redo, canUndo, canRedo, takeSnapshot } = useUndoRedo();
-
-  // Dynamic node types based on template
+  // ===== Dynamic Node Types =====
   const nodeTypes: NodeTypes = useMemo(() => {
     const nodeType = nodeTemplate === "compact" ? CompactNode : nodeTemplate === "photo" ? PhotoNode : FamilyNode;
-    return {
-      familyNode: nodeType,
-    };
+    return { familyNode: nodeType };
   }, [nodeTemplate]);
 
-  // Tính toán generations
+  // ===== Calculate Generations =====
   useEffect(() => {
     if (!data.length) return;
     const g = [...new Set(data.map((n) => n.doiThuoc || 1))].sort((a, b) => a - b);
@@ -106,7 +82,7 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
     setMaxGen(Math.min(3, Math.max(...g)));
   }, [data]);
 
-  // Chuyển đổi data thành nodes và edges
+  // ===== Build Graph (Nodes & Edges) =====
   const buildGraph = useCallback(() => {
     const filtered = data.filter((n) => (n.doiThuoc || 1) <= maxGen);
     
@@ -250,7 +226,7 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
     return { nodes: newNodes, edges: newEdges };
   }, [data, maxGen, highlightedNodes]);
 
-  // Apply layout khi data thay đổi
+  // ===== Apply Layout =====
   useEffect(() => {
     const { nodes: newNodes, edges: newEdges } = buildGraph();
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
@@ -262,104 +238,19 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
     setEdges(layoutedEdges);
   }, [buildGraph, direction, layoutAlgorithm, setNodes, setEdges]);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Z: Undo
-      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      }
-      // Ctrl+Y or Ctrl+Shift+Z: Redo
-      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
-        e.preventDefault();
-        handleRedo();
-      }
-      // Ctrl+0: Fit view
-      if (e.ctrlKey && e.key === '0') {
-        e.preventDefault();
-        fitView({ padding: 0.2, duration: 800 });
-      }
-      // Ctrl+F: Focus search
-      if (e.ctrlKey && e.key === 'f') {
-        e.preventDefault();
-        const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
-        searchInput?.focus();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nodes, edges, fitView]);
-
-  // Undo handler
-  const handleUndo = useCallback(() => {
-    const previous = undo(nodes, edges);
-    if (previous) {
-      setNodes(previous.nodes);
-      setEdges(previous.edges);
-    }
-  }, [undo, nodes, edges, setNodes, setEdges]);
-
-  // Redo handler
-  const handleRedo = useCallback(() => {
-    const next = redo();
-    if (next) {
-      setNodes(next.nodes);
-      setEdges(next.edges);
-    }
-  }, [redo, setNodes, setEdges]);
-
-  // Relayout manually
-  const handleRelayout = useCallback(() => {
-    takeSnapshot(nodes, edges);
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-      nodes,
-      edges,
-      { direction, algorithm: layoutAlgorithm }
-    );
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
-  }, [nodes, edges, direction, layoutAlgorithm, setNodes, setEdges, takeSnapshot]);
-
-  // Export handlers
-  const handleExportPng = useCallback(async () => {
-    try {
-      await exportToPng(nodes);
-    } catch (error) {
-      console.error('Export PNG failed:', error);
-      alert('Không thể export PNG. Vui lòng thử lại.');
-    }
-  }, [nodes]);
-
-  const handleExportSvg = useCallback(async () => {
-    try {
-      await exportToSvg(nodes);
-    } catch (error) {
-      console.error('Export SVG failed:', error);
-      alert('Không thể export SVG. Vui lòng thử lại.');
-    }
-  }, [nodes]);
-
-  // Print A3 handler
+  // ===== Print Handler =====
   const handlePrintA0 = useCallback(() => {
-    // Lưu dữ liệu vào localStorage để trang print preview sử dụng
     localStorage.setItem("printTreeData", JSON.stringify(data));
     localStorage.setItem("printTreeNodes", JSON.stringify(nodes));
     localStorage.setItem("printTreeEdges", JSON.stringify(edges));
-    
-    // Mở trang print preview trong tab mới
-    const printUrl = `/print-preview?dongHoId=${dongHoId || ""}`;
-    window.open(printUrl, "_blank");
+    window.open(`/print-preview?dongHoId=${dongHoId || ""}`, "_blank");
   }, [data, nodes, edges, dongHoId]);
 
-  // Search
+  // ===== Search Handlers =====
   const handleSearch = useCallback((query: string) => {
     setSearch(query);
-    // Không tìm real-time nữa, chỉ update state
   }, []);
 
-  // Thực hiện tìm kiếm khi nhấn Enter hoặc button
   const performSearch = useCallback(() => {
     if (!search.trim()) {
       setHighlightedNodes([]);
@@ -388,46 +279,23 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
     }
   }, [search, nodes, fitView]);
 
-  // Advanced search handler
-  const handleAdvancedSearch = useCallback((resultIds: string[]) => {
-    setHighlightedNodes(resultIds);
-    
-    // Jump to first result
-    if (resultIds.length > 0 && fitView) {
-      const firstNode = nodes.find((n) => n.id === resultIds[0]);
-      if (firstNode) {
-        setTimeout(() => {
-          fitView({ 
-            nodes: [firstNode], 
-            duration: 800, 
-            padding: 0.5,
-            maxZoom: 1.5
-          });
-        }, 100);
-      }
-    }
-  }, [nodes, fitView]);
-
-  // Double click to open modal
+  // ===== Double Click Handler =====
   const onNodeDoubleClick = useCallback((_: any, node: Node<FamilyNodeData>) => {
     setSelectedNodeData(node.data);
     setModalOpen(true);
   }, []);
 
-  // CRUD handlers
+  // ===== CRUD Handlers =====
   const handleAddMember = useCallback(() => {
-    console.log("➕ [Tree] handleAddMember called");
     setCrudMode("add");
     setSelectedMember(null);
     setCrudModalOpen(true);
-    console.log("✅ [Tree] CRUD modal should open now");
   }, []);
 
   const handleEditMember = useCallback((nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;
     
-    // Find the original member data
     const member = data.find((m) => m.thanhVienId === node.data.memberId);
     if (!member) return;
     
@@ -437,61 +305,37 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
   }, [nodes, data]);
 
   const handleDeleteMember = useCallback(async (nodeId: string) => {
-    console.log("🗑️ [Tree] handleDeleteMember called with nodeId:", nodeId);
-    
     const node = nodes.find((n) => n.id === nodeId);
-    if (!node) {
-      console.error("❌ [Tree] Node not found:", nodeId);
-      return;
-    }
-    
-    console.log("🔍 [Tree] Found node:", node.data);
-    
+    if (!node) return;
+        
     const confirmed = window.confirm(`Bạn có chắc muốn xóa thành viên "${node.data.hoTen}"?`);
-    if (!confirmed) {
-      console.log("❌ [Tree] User cancelled delete");
-      return;
-    }
+    if (!confirmed) return;
     
     try {
       if (!node.data.memberId) {
         throw new Error("Không tìm thấy ID thành viên");
       }
       
-      // Lấy user ID và dongHoId từ storage
       const user = storage.getUser();
       const userId = user?.nguoiDungId || "";
       const userDongHoId = user?.dongHoId;
       const finalDongHoId = dongHoId || userDongHoId;
       
-      console.log("📋 [Tree] Delete params:", {
-        memberId: node.data.memberId,
-        dongHoId: finalDongHoId,
-        userId
-      });
-      
-      // Kiểm tra dongHoId bắt buộc
       if (!finalDongHoId) {
         throw new Error("Không tìm thấy thông tin dòng họ");
       }
-      
-      console.log("🚀 [Tree] Calling deleteMember API...");
       
       const result = await deleteMember(
         [{ thanhVienId: node.data.memberId, dongHoId: finalDongHoId }],
         userId
       );
       
-      console.log("📥 [Tree] Delete result:", result);
-      
       if (result.success) {
         showSuccess("Xóa thành viên thành công!");
         
-        // Invalidate queries nếu có queryClient
         if (queryClient && finalDongHoId) {
           queryClient.invalidateQueries({ queryKey: ["member-tree", finalDongHoId] });
         }
-        // Fallback: gọi callback nếu có
         if (onDataChange) {
           onDataChange();
         }
@@ -499,156 +343,10 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
         throw new Error(result.message || "Không thể xóa thành viên");
       }
     } catch (error: any) {
-      console.error("❌ [Tree] Error deleting member:", error);
       showError(error.message || "Có lỗi xảy ra khi xóa thành viên");
     }
-  }, [nodes, showSuccess, showError, dongHoId, queryClient, onDataChange]);
-
-  // const handleSaveMember = useCallback(async (formData: Partial<ITreeNode>) => {
-  //   try {
-  //     // Lấy dongHoId từ user hiện tại thay vì props
-  //     const user = storage.getUser();
-  //     const userDongHoId = user?.dongHoId;
-      
-  //     // Fallback: lấy từ props hoặc từ data
-  //     let finalDongHoId = userDongHoId || dongHoId;
-      
-  //     if (!finalDongHoId && data.length > 0) {
-  //       // Thử lấy từ data có sẵn
-  //       finalDongHoId = data[0]?.dongHoId;
-  //     }
-      
-  //     if (!finalDongHoId) {
-  //       throw new Error("Không tìm thấy thông tin dòng họ");
-  //     }
-
-  //     // Lấy userId từ storage
-  //     const userId = user?.nguoiDungId || "";
-
-  //     // Format date cho API
-  //     const formatDateForAPI = (date: Date | string | undefined): string | undefined => {
-  //       if (!date) return undefined;
-  //       if (typeof date === 'string') return date;
-  //       return date.toISOString().split('T')[0];
-  //     };
-
-  //     if (crudMode === "add") {
-  //       // Tạo mới thành viên - format giống MemberModal
-  //       const payload = {
-  //         hoTen: formData.hoTen,
-  //         gioiTinh: formData.gioiTinh,
-  //         ngheNghiep: formData.ngheNghiep || "",
-  //         doiThuoc: formData.doiThuoc,
-  //         chaId: formData.chaId || null,
-  //         meId: formData.meId || null,
-  //         lu_user_id: userId,
-  //         nguoiTaoId: userId,
-  //         // Thêm các trường mới
-  //         ngaySinh: formatDateForAPI(formData.ngaySinh),
-  //         ngayMat: formatDateForAPI(formData.ngayMat),
-  //         noiSinh: formData.noiSinh || "",
-  //         noiMat: formData.noiMat || "",
-  //         trinhDoHocVan: formData.trinhDoHocVan || "",
-  //         diaChiHienTai: formData.diaChiHienTai || "",
-  //         tieuSu: formData.tieuSu || "",
-  //         // Chuyển pids thành voId hoặc chongId
-  //         voId: formData.gioiTinh === 1 && formData.pids && formData.pids.length > 0 ? formData.pids[0] : null,
-  //         chongId: formData.gioiTinh === 2 && formData.pids && formData.pids.length > 0 ? formData.pids[0] : null,
-  //       };
-        
-  //       // Xóa các field undefined/empty string
-  //       Object.keys(payload).forEach(key => {
-  //         const value = payload[key as keyof typeof payload];
-  //         if (value === undefined || value === '') {
-  //           delete payload[key as keyof typeof payload];
-  //         }
-  //       });
-        
-  //       console.log('📤 [Tree CRUD] Creating member:', payload);
-        
-  //       const result = await createMemberWithDongHo(payload, finalDongHoId);
-        
-  //       if (result.success) {
-  //         showSuccess("Thêm thành viên thành công!");
-  //         setCrudModalOpen(false);
-  //         setSelectedMember(null);
-          
-  //         // Invalidate queries nếu có queryClient
-  //         if (queryClient && finalDongHoId) {
-  //           queryClient.invalidateQueries({ queryKey: ["member-tree", finalDongHoId] });
-  //         }
-  //         // Fallback: gọi callback nếu có
-  //         if (onDataChange) {
-  //           onDataChange();
-  //         }
-  //       } else {
-  //         throw new Error(result.message || "Không thể thêm thành viên");
-  //       }
-  //     } else {
-  //       // Cập nhật thành viên
-  //       if (!selectedMember?.thanhVienId) {
-  //         throw new Error("Không tìm thấy ID thành viên");
-  //       }
-        
-  //       const payload = {
-  //         hoTen: formData.hoTen,
-  //         gioiTinh: formData.gioiTinh,
-  //         ngheNghiep: formData.ngheNghiep || "",
-  //         doiThuoc: formData.doiThuoc,
-  //         chaId: formData.chaId || null,
-  //         meId: formData.meId || null,
-  //         dongHoId: finalDongHoId, // Thêm dongHoId cho update
-  //         lu_user_id: userId,
-  //         // Thêm các trường mới
-  //         ngaySinh: formatDateForAPI(formData.ngaySinh),
-  //         ngayMat: formatDateForAPI(formData.ngayMat),
-  //         noiSinh: formData.noiSinh || "",
-  //         noiMat: formData.noiMat || "",
-  //         trinhDoHocVan: formData.trinhDoHocVan || "",
-  //         diaChiHienTai: formData.diaChiHienTai || "",
-  //         tieuSu: formData.tieuSu || "",
-  //         // Chuyển pids thành voId hoặc chongId
-  //         voId: formData.gioiTinh === 1 && formData.pids && formData.pids.length > 0 ? formData.pids[0] : null,
-  //         chongId: formData.gioiTinh === 2 && formData.pids && formData.pids.length > 0 ? formData.pids[0] : null,
-  //       };
-        
-  //       // Xóa các field undefined/empty string
-  //       Object.keys(payload).forEach(key => {
-  //         const value = payload[key as keyof typeof payload];
-  //         if (value === undefined || value === '') {
-  //           delete payload[key as keyof typeof payload];
-  //         }
-  //       });
-        
-  //       console.log('📤 [Tree CRUD] Updating member:', payload);
-        
-  //       const result = await updateMember(selectedMember.thanhVienId, payload);
-        
-  //       if (result.success) {
-  //         showSuccess("Cập nhật thành viên thành công!");
-  //         setCrudModalOpen(false);
-  //         setSelectedMember(null);
-          
-  //         // Invalidate queries nếu có queryClient
-  //         if (queryClient && finalDongHoId) {
-  //           queryClient.invalidateQueries({ queryKey: ["member-tree", finalDongHoId] });
-  //         }
-  //         // Fallback: gọi callback nếu có
-  //         if (onDataChange) {
-  //           onDataChange();
-  //         }
-  //       } else {
-  //         throw new Error(result.message || "Không thể cập nhật thành viên");
-  //       }
-  //     }
-  //   } catch (error: any) {
-  //     console.error("Error saving member:", error);
-  //     showError(error.message || "Có lỗi xảy ra khi lưu thành viên");
-  //     throw error;
-  //   }
-  // }, [crudMode, selectedMember, showSuccess, showError, dongHoId, data, queryClient, onDataChange]);
-
-  // Context menu handlers
+  }, [nodes, data, showSuccess, showError, dongHoId, queryClient, onDataChange]);
+  // ===== Context Menu Handlers =====
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
     setContextMenu({
@@ -656,44 +354,27 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
       top: event.clientY,
       left: event.clientX,
     });
-    setCanvasContextMenu(null);
-  }, []);
-
-  const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    setCanvasContextMenu({
-      top: event.clientY,
-      left: event.clientX,
-    });
-    setContextMenu(null);
   }, []);
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
-    setCanvasContextMenu(null);
   }, []);
 
-  // Node changes with snapshot
+  // ===== Node Changes Handler =====
   const handleNodesChange = useCallback((changes: any) => {
-    // Take snapshot before drag
-    if (changes.some((c: any) => c.type === 'position' && c.dragging)) {
-      takeSnapshot(nodes, edges);
-    }
     onNodesChange(changes);
-  }, [onNodesChange, nodes, edges, takeSnapshot]);
+  }, [onNodesChange]);
 
-  // Helper functions for modal
+  // ===== Helper Functions for Modal =====
   const getNameById = useCallback((id: string | number | null | undefined) => {
     if (id == null) return "Không có";
     const numId = typeof id === "string" ? Number(id) : id;
-    // Tìm trong data gốc theo fid/mid
     const person = data.find((n) => n.id === numId);
     return person?.hoTen || "Không có";
   }, [data]);
 
   const getChildren = useCallback((memberId: number | undefined) => {
     if (!memberId) return [];
-    // Tìm trong data gốc theo thanhVienId
     const parent = data.find((n) => n.thanhVienId === memberId);
     if (!parent) return [];
     
@@ -702,6 +383,7 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
       .map((n) => n.hoTen || "Chưa rõ");
   }, [data]);
 
+  // ===== Render =====
   return (
     <div className={`w-full h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gradient-to-b from-amber-50 to-stone-100'}`}>
       <ReactFlow
@@ -711,7 +393,6 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
         onEdgesChange={onEdgesChange}
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeContextMenu={onNodeContextMenu}
-        onPaneContextMenu={onPaneContextMenu}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
         fitView
@@ -724,14 +405,6 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
         }}
       >
         <Background color={darkMode ? "#374151" : "#d4a574"} gap={16} />
-        <MiniMap
-          nodeColor={(node) => {
-            const data = node.data as FamilyNodeData;
-            if (data.ngayMat) return "#9ca3af";
-            return data.gioiTinh === 1 ? "#3b82f6" : "#ec4899";
-          }}
-          maskColor={darkMode ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)"}
-        />
         
         <TreeControls
           maxGen={maxGen}
@@ -746,50 +419,9 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
           onRefresh={onDataChange}
           onPrint={handlePrintA0}
         />
-        
-        {/* Legend - Chú thích quan hệ */}
-        <div className={`absolute bottom-4 left-4 ${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg shadow-lg p-3 border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="text-xs font-semibold mb-2">Chú thích quan hệ:</div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <div className="w-10 h-0.5 bg-blue-500 rounded"></div>
-                <span className="text-blue-600 dark:text-blue-400">→</span>
-              </div>
-              <span className="font-medium">Cha → Con</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <div className="w-10 h-0.5 bg-pink-500 rounded"></div>
-                <span className="text-pink-600 dark:text-pink-400">→</span>
-              </div>
-              <span className="font-medium">Mẹ → Con</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-1 border-t-2 border-dashed border-orange-500"></div>
-              <span className="font-medium">Vợ chồng</span>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowEdgeLabels(!showEdgeLabels)}
-            className={`mt-2 w-full text-xs py-1 px-2 rounded ${
-              darkMode 
-                ? 'bg-gray-700 hover:bg-gray-600' 
-                : 'bg-gray-100 hover:bg-gray-200'
-            } transition-colors`}
-          >
-            {showEdgeLabels ? '🏷️ Ẩn nhãn' : '🏷️ Hiện nhãn'}
-          </button>
-        </div>
       </ReactFlow>
-      {/* Advanced Search */}
-      <AdvancedSearch
-        nodes={nodes}
-        onSearch={handleAdvancedSearch}
-        show={showAdvancedSearch}
-        onToggle={() => setShowAdvancedSearch(!showAdvancedSearch)}
-      />
-      {/* Context Menus */}
+      
+      {/* Context Menu */}
       {contextMenu && (
         <ContextMenu
           id={contextMenu.id}
@@ -802,33 +434,26 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
               setSelectedNodeData(node.data);
               setModalOpen(true);
             }
+            closeContextMenu();
           }}
           onEdit={() => {
             handleEditMember(contextMenu.id);
+            closeContextMenu();
           }}
           onDelete={() => {
             handleDeleteMember(contextMenu.id);
-            setContextMenu(null); // Đóng context menu sau khi xóa
+            closeContextMenu();
           }}
           onCenter={() => {
             const node = nodes.find((n) => n.id === contextMenu.id);
             if (node) {
               fitView({ nodes: [node], duration: 800, padding: 0.5 });
             }
+            closeContextMenu();
           }}
         />
       )}
 
-      {canvasContextMenu && (
-        <CanvasContextMenu
-          top={canvasContextMenu.top}
-          left={canvasContextMenu.left}
-          onClose={closeContextMenu}
-          onFitView={() => fitView({ padding: 0.2, duration: 800 })}
-          onExportPng={handleExportPng}
-          onExportSvg={handleExportSvg}
-        />
-      )}
 
       {/* Detail Modal */}
       {selectedNodeData && (
@@ -844,7 +469,6 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
               : "Còn sống",
             field_2: selectedNodeData.ngheNghiep || "Chưa rõ",
             img_0: selectedNodeData.anhChanDung,
-            // Thêm thông tin cha mẹ, vợ chồng từ data gốc
             fid: data.find((n) => n.thanhVienId === selectedNodeData.memberId)?.fid,
             mid: data.find((n) => n.thanhVienId === selectedNodeData.memberId)?.mid,
             pids: data.find((n) => n.thanhVienId === selectedNodeData.memberId)?.pids || [],

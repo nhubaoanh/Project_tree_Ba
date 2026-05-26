@@ -283,6 +283,7 @@ export default function QuanLyTinTucPage() {
           onSubmit={crud.handleSave}
           initialData={crud.editingItem}
           isLoading={crud.isSaving}
+          dongHoId={dongHoId!}
         />
       )}
 

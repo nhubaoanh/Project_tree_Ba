@@ -2,14 +2,14 @@
 
 /* Buttons that are missing cursor-pointer */
 button:not([disabled]) {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Interactive divs and spans with onClick */
 [onclick]:not([disabled]),
 div[onclick]:not([disabled]),
 span[onclick]:not([disabled]) {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Specific component fixes */
@@ -17,41 +17,41 @@ span[onclick]:not([disabled]) {
 /* Search clear buttons */
 .search-clear-button,
 button[aria-label="Clear search"] {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Modal close buttons */
 .modal-close-button,
 button[aria-label="Close"],
 button[aria-label="Đóng"] {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Navigation buttons */
 .nav-button,
 .sidebar-button,
 .menu-button {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Upload areas */
 .upload-area,
 .file-upload-trigger {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Interactive cards and items */
 .clickable-card,
 .interactive-item,
 .selectable-item {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Tree component interactive elements */
 .tree-node,
 .tree-control,
 .context-menu-item {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Form elements that should have pointer cursor */
@@ -59,7 +59,7 @@ select:not([disabled]),
 input[type="checkbox"]:not([disabled]),
 input[type="radio"]:not([disabled]),
 input[type="file"]:not([disabled]) {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Hover states that should have pointer cursor */
@@ -68,38 +68,55 @@ input[type="file"]:not([disabled]) {
 .hover\:opacity-80:hover,
 .hover\:scale-110:hover,
 .hover\:shadow-xl:hover {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Specific fixes for components found in search */
-.transition-colors:hover,
-.transition-transform:hover,
-.transition-all:hover {
-  cursor: pointer;
+.transition-colors:not([disabled]):hover,
+.transition-transform:not([disabled]):hover,
+.transition-all:not([disabled]):hover {
+  cursor: pointer !important;
 }
 
 /* Toast notifications that are clickable */
 .toast-clickable {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 /* Table rows that are hoverable/clickable
 tr:hover,
 .table-row:hover {
-  cursor: pointer;
+  cursor: pointer !important;
 } */
 
 /* Icon buttons */
 .icon-button,
 button > svg,
 button > .lucide {
-  cursor: pointer;
+  cursor: pointer !important;
+}
+
+/* Fix for buttons with flex/gap classes */
+button.flex:not([disabled]),
+button.inline-flex:not([disabled]) {
+  cursor: pointer !important;
+}
+
+/* Fix for buttons with specific background colors */
+button.bg-red-600:not([disabled]),
+button.bg-blue-600:not([disabled]),
+button.bg-green-600:not([disabled]),
+button.bg-amber-600:not([disabled]),
+button.bg-\[#b91c1c\]:not([disabled]),
+button.bg-\[#d4af37\]:not([disabled]) {
+  cursor: pointer !important;
 }
 
 /* Disabled state override */
 [disabled],
 .disabled,
-.opacity-50 {
+button[disabled],
+button.disabled {
   cursor: not-allowed !important;
 }
 
@@ -107,4 +124,11 @@ button > .lucide {
 .loading,
 .animate-spin {
   cursor: wait !important;
+}
+
+/* Ensure all clickable elements in modals have pointer cursor */
+[role="dialog"] button:not([disabled]),
+.modal button:not([disabled]),
+.dialog button:not([disabled]) {
+  cursor: pointer !important;
 }

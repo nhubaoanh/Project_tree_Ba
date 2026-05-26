@@ -1,9 +1,11 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { X, Loader2, Bold, Italic, Underline, List, ListOrdered, Link, Image } from "lucide-react";
+import { X, Loader2, Bold, Italic, Underline, List, ListOrdered, Link, Image, Upload, Trash2, Image as ImageIcon } from "lucide-react";
 import { ITinTuc } from "@/service/tintuc.service";
 import { FormRules, validateForm, validateField } from "@/lib/validator";
 import { useToast } from "@/service/useToas";
+import { uploadFile } from "@/service/upload.service";
+import { getImageUrl } from "@/utils/imageUtils";
 
 interface TinTucModalProps {
   isOpen: boolean;
@@ -11,6 +13,7 @@ interface TinTucModalProps {
   onSubmit: (data: Partial<ITinTuc>) => void;
   initialData: ITinTuc | null;
   isLoading: boolean;
+  dongHoId: string;
 }
 
 // Validation rules
@@ -28,9 +31,11 @@ export function TinTucModal({
   onSubmit,
   initialData,
   isLoading,
+  dongHoId,
 }: TinTucModalProps) {
   const { showError } = useToast();
   const editorRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<Partial<ITinTuc>>({
     tieuDe: "",
@@ -42,10 +47,14 @@ export function TinTucModal({
   });
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setFormData({
+        tinTucId: initialData?.tinTucId,
+        dongHoId: dongHoId,
         tieuDe: initialData?.tieuDe || "",
         noiDung: initialData?.noiDung || "",
         tomTat: initialData?.tomTat || "",
@@ -53,6 +62,7 @@ export function TinTucModal({
         tacGia: initialData?.tacGia || "",
         ghim: initialData?.ghim || 0,
       });
+      setPreviewUrl(initialData?.anhDaiDien ? getImageUrl(initialData.anhDaiDien) : null);
       setErrors({});
       setTouched({});
       
@@ -61,7 +71,7 @@ export function TinTucModal({
         editorRef.current.innerHTML = initialData?.noiDung || "";
       }
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, dongHoId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -114,6 +124,49 @@ export function TinTucModal({
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith("image/")) {
+      showError("Vui lòng chọn file ảnh!");
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      showError("File không được vượt quá 5MB!");
+      return;
+    }
+
+    const localPreview = URL.createObjectURL(file);
+    setPreviewUrl(localPreview);
+    setUploading(true);
+    
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", file);
+      const result = await uploadFile(formDataUpload);
+      
+      if (result.success) {
+        setFormData((prev) => ({ ...prev, anhDaiDien: result.path }));
+      } else {
+        throw new Error(result.message || "Upload thất bại");
+      }
+    } catch (error: any) {
+      console.error("Upload failed:", error);
+      showError(error.message || "Upload ảnh thất bại!");
+      setPreviewUrl(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setPreviewUrl(null);
+    setFormData((prev) => ({ ...prev, anhDaiDien: "" }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -144,6 +197,58 @@ export function TinTucModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+          {/* Upload Ảnh Đại Diện */}
+          <div className="space-y-2">
+            <label className="block text-xl font-bold text-[#8b5e3c] mb-1">Ảnh đại diện</label>
+            <div className="flex items-start gap-4">
+              <div className="w-24 h-24 border-2 border-dashed border-[#d4af37] rounded-lg overflow-hidden flex items-center justify-center bg-[#fdf6e3] flex-shrink-0">
+                {uploading ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-[#d4af37]" />
+                ) : previewUrl ? (
+                  <img 
+                    src={previewUrl} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/images/vangoc.jpg';
+                    }}
+                  />
+                ) : (
+                  <ImageIcon className="w-8 h-8 text-[#d4af37] opacity-50" />
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <input 
+                  ref={fileInputRef} 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageUpload} 
+                  className="hidden" 
+                />
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()} 
+                  disabled={uploading}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#d4af37] text-white rounded hover:bg-[#b8962f] disabled:opacity-50 cursor-pointer transition-colors text-sm"
+                >
+                  <Upload size={16} />
+                  {uploading ? "Đang tải..." : "Chọn ảnh"}
+                </button>
+                {previewUrl && (
+                  <button 
+                    type="button" 
+                    onClick={handleRemoveImage}
+                    className="flex items-center gap-2 px-4 py-2 border border-red-500 text-red-500 rounded hover:bg-red-50 cursor-pointer transition-colors text-sm"
+                  >
+                    <Trash2 size={16} />
+                    Xóa ảnh
+                  </button>
+                )}
+                <p className="text-xs text-gray-500 mt-1">Kích thước tối đa: 5MB</p>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xl font-bold text-[#8b5e3c] mb-1">
               Tiêu đề <span className="text-red-500">*</span>
@@ -190,7 +295,7 @@ export function TinTucModal({
               <button
                 type="button"
                 onClick={() => execCommand('bold')}
-                className="p-2 hover:bg-gray-200 rounded transition-colors"
+                className="p-2 hover:bg-gray-200 rounded transition-colors cursor-pointer"
                 title="Đậm"
               >
                 <Bold size={16} />
@@ -198,7 +303,7 @@ export function TinTucModal({
               <button
                 type="button"
                 onClick={() => execCommand('italic')}
-                className="p-2 hover:bg-gray-200 rounded transition-colors"
+                className="p-2 hover:bg-gray-200 rounded transition-colors cursor-pointer"
                 title="Nghiêng"
               >
                 <Italic size={16} />
@@ -206,7 +311,7 @@ export function TinTucModal({
               <button
                 type="button"
                 onClick={() => execCommand('underline')}
-                className="p-2 hover:bg-gray-200 rounded transition-colors"
+                className="p-2 hover:bg-gray-200 rounded transition-colors cursor-pointer"
                 title="Gạch chân"
               >
                 <Underline size={16} />
@@ -215,7 +320,7 @@ export function TinTucModal({
               <button
                 type="button"
                 onClick={() => execCommand('insertUnorderedList')}
-                className="p-2 hover:bg-gray-200 rounded transition-colors"
+                className="p-2 hover:bg-gray-200 rounded transition-colors cursor-pointer"
                 title="Danh sách"
               >
                 <List size={16} />
@@ -223,7 +328,7 @@ export function TinTucModal({
               <button
                 type="button"
                 onClick={() => execCommand('insertOrderedList')}
-                className="p-2 hover:bg-gray-200 rounded transition-colors"
+                className="p-2 hover:bg-gray-200 rounded transition-colors cursor-pointer"
                 title="Danh sách số"
               >
                 <ListOrdered size={16} />
@@ -235,7 +340,7 @@ export function TinTucModal({
                   const url = prompt('Nhập URL:');
                   if (url) execCommand('createLink', url);
                 }}
-                className="p-2 hover:bg-gray-200 rounded transition-colors"
+                className="p-2 hover:bg-gray-200 rounded transition-colors cursor-pointer"
                 title="Chèn link"
               >
                 <Link size={16} />
@@ -246,7 +351,7 @@ export function TinTucModal({
                   const url = prompt('Nhập URL ảnh:');
                   if (url) execCommand('insertImage', url);
                 }}
-                className="p-2 hover:bg-gray-200 rounded transition-colors"
+                className="p-2 hover:bg-gray-200 rounded transition-colors cursor-pointer"
                 title="Chèn ảnh"
               >
                 <Image size={16} />
@@ -320,23 +425,6 @@ export function TinTucModal({
                 <p className="text-red-500 text-xs mt-1">{errors.tacGia}</p>
               )}
             </div>
-            <div>
-              <label className="block text-xl font-bold text-[#8b5e3c] mb-1">Ảnh đại diện</label>
-              <input
-                type="text"
-                name="anhDaiDien"
-                value={formData.anhDaiDien || ""}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={`w-full px-3 py-2.5 bg-white border rounded shadow-inner focus:outline-none transition-colors ${
-                  touched.anhDaiDien && errors.anhDaiDien ? "border-red-500" : "border-[#d4af37]/50 focus:border-[#b91c1c]"
-                }`}
-                placeholder="URL ảnh đại diện"
-              />
-              {touched.anhDaiDien && errors.anhDaiDien && (
-                <p className="text-red-500 text-xs mt-1">{errors.anhDaiDien}</p>
-              )}
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -357,7 +445,8 @@ export function TinTucModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2 text-[#5d4037] font-bold hover:text-[#b91c1c] transition-colors"
+            disabled={isLoading || uploading}
+            className="px-6 py-2 text-[#5d4037] font-bold hover:text-[#b91c1c] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Đóng
           </button>
@@ -365,8 +454,8 @@ export function TinTucModal({
             type="submit"
             form="tinTucForm"
             onClick={handleSubmit}
-            disabled={isLoading}
-            className="px-8 py-2 bg-[#b91c1c] text-white font-bold rounded shadow hover:bg-[#991b1b] disabled:opacity-50 flex items-center gap-2 transition-colors"
+            disabled={isLoading || uploading}
+            className="px-8 py-2 bg-[#b91c1c] text-white font-bold rounded shadow hover:bg-[#991b1b] disabled:opacity-50 flex items-center gap-2 transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
             {isLoading && <Loader2 className="animate-spin" size={18} />}
             {isLoading ? "Đang lưu..." : initialData ? "Cập nhật" : "Thêm mới"}

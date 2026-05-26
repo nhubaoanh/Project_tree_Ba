@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Calendar, MapPin, ChevronDown, ArrowUp, Filter } from "lucide-react";
+import { Calendar, MapPin, ChevronDown, ArrowUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { searchEvent } from "@/service/event.service";
 import { IsearchEvent } from "@/types/event";
@@ -9,33 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import storage from "@/utils/storage";
 import { IEvent } from "@/types/event";
-
-
-const getBadgeColor = (type: string) => {
-  switch (type) {
-    case "TIN_VUI":
-      return "bg-pink-100 text-pink-800 hover:bg-pink-100";
-    case "TIN_BUON":
-      return "bg-gray-100 text-gray-800 hover:bg-gray-100";
-    case "SU_KIEN":
-      return "bg-orange-100 text-orange-800 hover:bg-orange-100";
-    default:
-      return "bg-blue-100 text-blue-800 hover:bg-blue-100";
-  }
-};
 
 export const SuKienPage: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(3);
   const [dongHoId, setDongHoId] = useState<string>("");
-  const [selectedType, setSelectedType] = useState<string>("ALL");
 
   // Lấy dongHoId từ user đã đăng nhập
   useEffect(() => {
@@ -54,29 +33,42 @@ export const SuKienPage: React.FC = () => {
   const eventQuery = useQuery({
     queryKey: ["events", searchParams],
     queryFn: () => searchEvent(searchParams),
-    enabled: !!dongHoId, // Chỉ gọi API khi có dongHoId
+    enabled: !!dongHoId,
   });
 
-  // Lấy danh sách loại sự kiện duy nhất
-  const eventTypes = React.useMemo(() => {
-    const events = (eventQuery.data?.data || []) as IEvent[];
-    const types = new Set(events.map((e) => e.tenLoaiSuKien));
-    return Array.from(types);
-  }, [eventQuery.data?.data]);
-
-  // Sắp xếp và lọc sự kiện
+  // Sắp xếp sự kiện: Sắp diễn ra lên đầu (gần nhất trước), sau đó đến đã kết thúc (mới nhất trước)
   const sortedEvents = React.useMemo(
     () => {
       const events = (eventQuery.data?.data || []) as IEvent[];
-      return [...events]
-        .filter((event) => selectedType === "ALL" || event.tenLoaiSuKien === selectedType)
-        .sort(
-          (a, b) =>
-            new Date(b.ngayDienRa + "T" + b.gioDienRa).getTime() -
-            new Date(a.ngayDienRa + "T" + a.gioDienRa).getTime()
-        );
+      const now = new Date();
+      
+      return [...events].sort((a, b) => {
+        // Parse ngày giờ đúng cách
+        const dateA = new Date(a.ngayDienRa);
+        const [hoursA, minutesA] = (a.gioDienRa || "00:00:00").split(":").map(Number);
+        dateA.setHours(hoursA, minutesA, 0, 0);
+        
+        const dateB = new Date(b.ngayDienRa);
+        const [hoursB, minutesB] = (b.gioDienRa || "00:00:00").split(":").map(Number);
+        dateB.setHours(hoursB, minutesB, 0, 0);
+        
+        const nowTime = now.getTime();
+        const isAUpcoming = dateA.getTime() >= nowTime;
+        const isBUpcoming = dateB.getTime() >= nowTime;
+        
+        // Sự kiện sắp diễn ra lên đầu
+        if (isAUpcoming && !isBUpcoming) return -1;
+        if (!isAUpcoming && isBUpcoming) return 1;
+        
+        // Cùng trạng thái thì sắp xếp theo thời gian
+        if (isAUpcoming) {
+          return dateA.getTime() - dateB.getTime(); // Sắp diễn ra: gần nhất lên đầu
+        } else {
+          return dateB.getTime() - dateA.getTime(); // Đã kết thúc: mới nhất lên đầu
+        }
+      });
     },
-    [eventQuery.data?.data, selectedType]
+    [eventQuery.data?.data]
   );
 
   // Chỉ hiển thị số lượng sự kiện theo visibleCount
@@ -93,76 +85,26 @@ export const SuKienPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Hàm lấy tên hiển thị cho loại sự kiện
-  const getEventTypeLabel = (type: string) => {
-    if (type === "ALL") return "Tất cả sự kiện";
-    return type;
-  };
-
-  // Hàm đếm số lượng sự kiện theo loại
-  const getEventCount = (type: string) => {
-    const events = (eventQuery.data?.data || []) as IEvent[];
-    if (type === "ALL") return events.length;
-    return events.filter((e) => e.tenLoaiSuKien === type).length;
+  // Kiểm tra sự kiện đã kết thúc hay chưa (dựa vào ngày và giờ diễn ra)
+  const isEventCompleted = (event: IEvent) => {
+    const eventDate = new Date(event.ngayDienRa);
+    const [hours, minutes] = (event.gioDienRa || "00:00:00").split(":").map(Number);
+    eventDate.setHours(hours, minutes, 0, 0);
+    
+    const now = new Date();
+    return eventDate.getTime() < now.getTime();
   };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* Tiêu đề trang và Bộ lọc */}
+      {/* Tiêu đề trang */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-[#b91c1c] mb-2">
           Bảng Tin Dòng Họ
         </h1>
-        <p className="text-[#8b5e3c] mb-4">
+        <p className="text-[#8b5e3c] mb-6">
           Cập nhật thông tin mới nhất về dòng họ
         </p>
-
-        {/* Dropdown bộ lọc */}
-        {dongHoId && eventTypes.length > 0 && (
-          <div className="flex justify-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="px-6 py-2">
-                  <Filter className="mr-2 h-4 w-4" />
-                  {getEventTypeLabel(selectedType)} ({getEventCount(selectedType)})
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-56">
-                <DropdownMenuItem
-                  onClick={() => {
-                    setSelectedType("ALL");
-                    setVisibleCount(3);
-                  }}
-                  className={selectedType === "ALL" ? "bg-accent" : ""}
-                >
-                  <span className="flex-1">Tất cả sự kiện</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {getEventCount("ALL")}
-                  </Badge>
-                </DropdownMenuItem>
-                {eventTypes.map((type) => (
-                  <DropdownMenuItem
-                    key={type}
-                    onClick={() => {
-                      setSelectedType(type);
-                      setVisibleCount(3);
-                    }}
-                    className={selectedType === type ? "bg-accent" : ""}
-                  >
-                    <span className="flex-1">{type}</span>
-                    <Badge 
-                      variant="secondary" 
-                      className={`ml-2 ${getBadgeColor(type)}`}
-                    >
-                      {getEventCount(type)}
-                    </Badge>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
       </div>
 
       {/* Danh sách sự kiện */}
@@ -198,9 +140,9 @@ export const SuKienPage: React.FC = () => {
           displayedEvents.map((item) => (
             <Card
               key={item.suKienId}
-              className="relative overflow-hidden group aspect-[2/3] min-h-[500px]"
+              className="relative overflow-hidden group aspect-[2/3] min-h-[500px] hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] border-2 border-[#d4af37]"
             >
-              {/* Hình nền */}
+              {/* Hình nền với opacity cao hơn */}
               <div className="absolute inset-0 z-0">
                 <img
                   src="/images/backgrouNotifi.png"
@@ -212,25 +154,34 @@ export const SuKienPage: React.FC = () => {
               {/* Nội dung */}
               <div className="relative z-10 h-full flex flex-col justify-between p-6">
                 {/* Header với badge */}
-                <div className="flex justify-between items-start">
-                  {item.uuTien === 0 && (
-                    <Badge className="bg-[#d4af37] text-white">
-                      <span className="mr-1">⭐</span> Đã ghim
-                    </Badge>
-                  )}
-                  <Badge className={getBadgeColor(item.tenLoaiSuKien)}>
-                    {item.tenLoaiSuKien}
-                  </Badge>
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex flex-col gap-2">
+                    {item.uuTien === 0 && (
+                      <Badge className="bg-[#d4af37] text-white w-fit shadow-md animate-pulse">
+                        <span className="mr-1">⭐</span> Đã ghim
+                      </Badge>
+                    )}
+                    {/* Badge trạng thái sự kiện */}
+                    {isEventCompleted(item) ? (
+                      <Badge className="bg-gray-500 text-white w-fit shadow-md">
+                        ✓ Đã kết thúc
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-green-500 text-white w-fit shadow-md animate-pulse">
+                        ⏰ Sắp diễn ra
+                      </Badge>
+                    )}
+                  </div>
                 </div>
 
                 {/* Nội dung sự kiện */}
                 <div className="text-center">
-                  <h3 className="text-2xl font-bold text-[#5d4037] font-serif italic leading-tight mb-6">
+                  <h3 className="text-2xl font-bold text-[#5d4037] font-serif italic leading-tight mb-6 group-hover:text-[#b91c1c] transition-colors">
                     {item.tenSuKien}
                   </h3>
 
                   {/* Thời gian và ngày tháng */}
-                  <div className="mb-6">
+                  <div className="mb-6 bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-md border border-[#d4af37]/30">
                     <div className="flex items-center justify-center gap-2 text-sm text-[#5d4037] font-bold mb-2">
                       <Calendar size={16} />
                       <span>
@@ -241,7 +192,7 @@ export const SuKienPage: React.FC = () => {
                         })}
                       </span>
                     </div>
-                    <div className="text-base font-bold text-[#5d4037]">
+                    <div className="text-lg font-bold text-[#b91c1c]">
                       {item.gioDienRa?.substring(0, 5) || "Chưa cập nhật"}
                     </div>
                   </div>
@@ -256,19 +207,19 @@ export const SuKienPage: React.FC = () => {
                   </div>
 
                   {/* Mô tả */}
-                  <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed max-w-xs mx-auto mb-6">
+                  <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed max-w-xs mx-auto mb-6 bg-white/40 backdrop-blur-sm rounded-lg p-3">
                     {item.moTa || "Không có mô tả"}
                   </p>
 
                   {/* Địa điểm */}
-                  <div className="flex items-center justify-center gap-2 text-sm text-[#5d4037]">
-                    <MapPin size={16} />
-                    <span>{item.diaDiem || "Chưa cập nhật địa điểm"}</span>
+                  <div className="flex items-center justify-center gap-2 text-sm text-[#5d4037] bg-white/60 backdrop-blur-sm rounded-lg p-3 shadow-sm">
+                    <MapPin size={16} className="text-[#b91c1c]" />
+                    <span className="font-medium">{item.diaDiem || "Chưa cập nhật địa điểm"}</span>
                   </div>
                 </div>
 
                 {/* Footer */}
-                <div className="text-center">
+                <div className="text-center bg-white/60 backdrop-blur-sm rounded-lg p-3 shadow-sm">
                   <p className="text-xs text-[#8b5e3c] italic">Người tạo</p>
                   <p className="text-sm font-bold text-[#5d4037] italic">
                     {item.full_name || "Không rõ"}

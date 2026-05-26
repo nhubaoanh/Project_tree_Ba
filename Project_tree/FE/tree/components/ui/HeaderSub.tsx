@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { NavButton } from "./NavButton"; 
 import { ViewMode } from "@/types/familytree";
 import Image from "next/image";
-import { LogOut, User, ChevronDown } from "lucide-react";
+import { LogOut, User, ChevronDown, ChevronUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import storage from "@/utils/storage";
 
@@ -15,6 +15,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
   const router = useRouter();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -51,55 +52,97 @@ export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
     { key: ViewMode.DIAGRAM, label: "Phả Đồ" },
     { key: ViewMode.EVENT, label: "Sự Kiện" },
     { key: ViewMode.NEWS, label: "Tin Tức" },
+    { key: ViewMode.Walet, label: "Đóng góp" },
   ];
 
   return (
     <>
-      <header className="w-full h-[180px] sm:h-[200px] bg-gradient-to-b bg-[#ede5b7] relative overflow-hidden border-b-1 border-yellow-600/50">
+      <header className={`w-full bg-gradient-to-b bg-[#ede5b7] relative overflow-hidden border-b-1 border-yellow-600/50 transition-all duration-300 ${
+        isCollapsed ? 'h-[60px]' : 'h-[180px] sm:h-[200px]'
+      }`}>
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay pointer-events-none"></div>
 
-        <div className="relative z-10 h-full grid grid-cols-3 gap-2 items-center px-4 md:px-8 max-w-7xl mx-auto">
-        <div className="flex justify-start items-center opacity-80 hover:opacity-100 transition-opacity h-full">
-          <Image
-            src="/images/en.png"
-            alt="Dao"
-            width={230}
-            height={230}
-            quality={80}
-          />
-        </div>
-        <div className="flex flex-col items-center justify-center h-full pt-2">
-          <div className="mb-13 transform hover:scale-105 transition-transform duration-500">
-            <Image
-              src="/images/logo1.png"
-              alt="Dao"
-              width={280}
-              height={280}
-              quality={80}
-            />
+        {isCollapsed ? (
+          // Header thu gọn - chỉ hiện 5 nút ở giữa
+          <div className="relative z-10 h-full flex items-center justify-between px-4 md:px-8 max-w-7xl mx-auto">
+            {/* Khoảng trống bên trái */}
+            <div className="w-12"></div>
+            
+            {/* 5 nút navigation ở giữa */}
+            <nav className="flex items-center gap-2 md:gap-4 z-20">
+              {navItems.map((item) => (
+                <NavButton
+                  key={item.key}
+                  text={item.label}
+                  isActive={activeView === item.key}
+                  onClick={() => onNavigate(item.key)}
+                />
+              ))}
+            </nav>
+
+            {/* Nút mở rộng - góc phải */}
+            <button
+              onClick={() => setIsCollapsed(false)}
+              className="p-2 rounded-full hover:bg-white/30 transition-all z-30"
+              title="Mở rộng header"
+            >
+              <ChevronDown size={24} className="text-[#5d4037]" />
+            </button>
           </div>
-          <nav className="flex flex-wrap justify-center text-[17px] items-center gap-3 md:gap-4 w-full absolute bottom-2">
-            {navItems.map((item) => (
-              <NavButton
-                key={item.key}
-                text={item.label}
-                isActive={activeView === item.key}
-                onClick={() => onNavigate(item.key)}
+        ) : (
+          // Header đầy đủ - có logo và hình ảnh
+          <div className="relative z-10 h-full grid grid-cols-3 gap-2 items-center px-4 md:px-8 max-w-7xl mx-auto">
+            {/* Nút thu gọn - góc trên bên phải */}
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/30 transition-all z-50"
+              title="Thu gọn header"
+            >
+              <ChevronUp size={24} className="text-[#5d4037]" />
+            </button>
+
+            <div className="flex justify-start items-center opacity-80 hover:opacity-100 transition-opacity h-full">
+              <Image
+                src="/images/en.png"
+                alt="Dao"
+                width={230}
+                height={230}
+                quality={80}
               />
-            ))}
-          </nav>
-        </div>
-        <div className="flex justify-end items-center opacity-80 hover:opacity-100 transition-opacity h-full">
-          <Image
-            src="/images/backgroudrignt.png"
-            alt="Dao"
-            width={280}
-            height={280}
-            quality={80}
-          />
-        </div>
-      </div>
-    </header>
+            </div>
+            <div className="flex flex-col items-center justify-center h-full pt-2">
+              <div className="mb-13 transform hover:scale-105 transition-transform duration-500">
+                <Image
+                  src="/images/logo1.png"
+                  alt="Dao"
+                  width={280}
+                  height={280}
+                  quality={80}
+                />
+              </div>
+              <nav className="flex flex-wrap justify-center text-[17px] items-center gap-3 md:gap-4 w-full absolute bottom-2 z-20">
+                {navItems.map((item) => (
+                  <NavButton
+                    key={item.key}
+                    text={item.label}
+                    isActive={activeView === item.key}
+                    onClick={() => onNavigate(item.key)}
+                  />
+                ))}
+              </nav>
+            </div>
+            <div className="flex justify-end items-center opacity-80 hover:opacity-100 transition-opacity h-full">
+              <Image
+                src="/images/backgroudrignt.png"
+                alt="Dao"
+                width={280}
+                height={280}
+                quality={80}
+              />
+            </div>
+          </div>
+        )}
+      </header>
 
     {/* User Menu - Floating button góc dưới trái */}
     <div className="fixed bottom-6 left-6 z-50" ref={menuRef}>
