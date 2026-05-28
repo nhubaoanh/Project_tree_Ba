@@ -1,416 +1,286 @@
 "use client";
-import React, { useRef } from "react";
-import { DollarSign, Plus, Download, Upload, Trash2, Edit, User, Calendar, CreditCard, FileText, Phone, MessageSquare, AlertCircle, CheckCircle } from "lucide-react";
-import { IContributionUp, IsearchContributionUp } from "@/types/contribuitionUp";
-import { createContributionUp, deleteContributionUp, searchContributionUp, updateContributionUp, downloadTemplateWithSample, exportExcel, importFromExcel } from "@/service/contribuitionUp.service";
-import { ContributionUpModal } from "./components/contribuitionUpModal";
-import { useCrudPage } from "@/hooks";
-import storage from "@/utils/storage";
+import React, { useMemo, useState } from "react";
 import {
-  PageLayout, 
-  DataTable, 
-  DeleteModal, 
-  DetailModal,
-  PageLoading, 
-  ErrorState,
-  NoFamilyTreeState,
-  ColumnConfig,
-  ActionConfig,
-  DetailSection,
-  DetailField
-} from "@/components/shared";
-import { ErrorModal } from "@/components/shared/ErrorModal";
+  DollarSign, Users, TrendingUp, Search, Calendar,
+  RefreshCw, ChevronLeft, ChevronRight,
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getContributionsByDongHo } from "@/service/contribution.service";
+import storage from "@/utils/storage";
+import { PageLayout, PageLoading, ErrorState, NoFamilyTreeState } from "@/components/shared";
 
-export default function QuanLyTaiChinhThuPage() {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+interface BankTransaction {
+  bankTransactionId: string;
+  tenTaiKhoanChuyen?: string;
+  ngayChuyenKhoan?: string;
+  soTien: number;
+  phuongThucThanhToan?: string;
+  trangThai?: string;
+  noiDungChuyenKhoan?: string;
+  maGiaoDichNganHang?: string;
+}
 
-  // Get user info
+const STATUS_OPTIONS = [
+  { value: "verified",  label: "Đã xác thực" },
+  { value: "completed", label: "Hoàn thành" },
+  { value: "pending",   label: "Chờ xác nhận" },
+  { value: "failed",    label: "Thất bại" },
+];
+
+const METHOD_OPTIONS = [
+  { value: "",               label: "Tất cả phương thức" },
+  { value: "vnpay",          label: "VNPay" },
+  { value: "momo",           label: "Momo" },
+  { value: "bank_transfer",  label: "Chuyển khoản" },
+];
+
+const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  verified:  { label: "Đã xác thực",  className: "bg-green-100 text-green-800" },
+  completed: { label: "Hoàn thành",   className: "bg-blue-100 text-blue-800" },
+  pending:   { label: "Chờ xác nhận", className: "bg-yellow-100 text-yellow-800" },
+  failed:    { label: "Thất bại",     className: "bg-red-100 text-red-800" },
+};
+
+export default function QuanLyDongQuyPage() {
   const user = storage.getUser();
   const dongHoId = user?.dongHoId;
 
-  // Use generic CRUD hook
-  const crud = useCrudPage<IContributionUp>({
-    queryKey: ["contribuitionUp", dongHoId || ""],
-    operations: {
-      search: (params) => {
-        const searchParams: IsearchContributionUp = {
-          pageIndex: params.pageIndex,
-          pageSize: params.pageSize,
-          search_content: params.search_content,
-          dongHoId: dongHoId || "",
-        };
-        return searchContributionUp(searchParams);
-      },
-      create: (data) => createContributionUp(data as IContributionUp),
-      update: (data) => updateContributionUp(data as IContributionUp),
-      delete: (params) => {
-        const listJson = params.items.map((item: IContributionUp) => ({ 
-          thuId: item.thuId,
-          dongHoId: item.dongHoId 
-        }));
-        return deleteContributionUp(listJson, params.userId || user?.nguoiDungId || "");
-      },
-      export: () => exportExcel(),
-      import: (file) => importFromExcel(file)
-    },
-    searchParams: { dongHoId: dongHoId || "" },
-    tableConfig: {
-      initialPageSize: 5,
-      enableSelection: true,
-      enableSearch: true
-    },
-    enableImportExport: true,
-    messages: {
-      createSuccess: "Thêm dữ liệu đóng góp thành công!",
-      updateSuccess: "Cập nhật dữ liệu thành công!",
-      deleteSuccess: "Đã xóa thành công.",
-      createError: "Có lỗi xảy ra khi thêm khoản thu.",
-      updateError: "Có lỗi xảy ra khi cập nhật khoản thu.",
-      deleteError: "Không thể xóa khoản thu này."
-    }
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [statusFilter, setStatusFilter] = useState("verified");
+  const [methodFilter, setMethodFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: response, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ["admin-contributions", dongHoId, currentPage, pageSize, statusFilter],
+    queryFn: () => getContributionsByDongHo(dongHoId || "", currentPage, pageSize, statusFilter),
+    enabled: !!dongHoId,
   });
 
-  // Custom handlers để giữ logic đặc biệt
-  const handleDeleteClick = (item: IContributionUp) => {
-    if (crud.selectedIds.length > 1 && crud.selectedIds.includes(item.thuId)) {
-      const selected = crud.data.filter((e: IContributionUp) => crud.selectedIds.includes(e.thuId));
-      crud.handleDelete(selected);
-    } else {
-      crud.handleDelete([item]);
-    }
-  };
+  const transactions: BankTransaction[] = Array.isArray(response?.data) ? response.data : [];
+  const totalRecords = response?.pagination?.total ?? transactions.length;
+  const totalPages   = response?.pagination?.totalPages ?? 1;
 
-  const handleDeleteSelected = () => {
-    const selected = crud.data.filter((e: IContributionUp) => crud.selectedIds.includes(e.thuId));
-    crud.handleDelete(selected);
-  };
+  const filtered = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return transactions.filter((t) => {
+      if (methodFilter && t.phuongThucThanhToan !== methodFilter) return false;
+      if (!q) return true;
+      return [t.tenTaiKhoanChuyen, t.noiDungChuyenKhoan, t.maGiaoDichNganHang]
+        .filter(Boolean)
+        .some((v) => v!.toLowerCase().includes(q));
+    });
+  }, [transactions, methodFilter, searchTerm]);
 
-  // Download template handler
-  const handleDownloadTemplateWithSample = async () => {
-    try {
-      const blob = await downloadTemplateWithSample();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'MauNhap_TaiChinhThu.xlsx';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Download template error:", error);
-    }
-  };
+  const totalAmount      = filtered.reduce((s, t) => s + Number(t.soTien), 0);
+  const uniqueContributors = new Set(filtered.map((t) => t.tenTaiKhoanChuyen || "")).size;
 
-  // File input handler - sử dụng crud.handleImport
-  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    const allowedTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel'
-    ];
-    
-    if (!allowedTypes.includes(file.type)) {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    // Validate file size (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    // Sử dụng crud.handleImport - sẽ tự động hiển thị DetailModal khi có lỗi
-    if (crud.handleImport) {
-      await crud.handleImport(file);
-    }
-    
-    // Reset file input
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  // Memoize actions để tránh re-render không cần thiết
-  const pageActions = React.useMemo(() => [
-    // Bulk actions - hiển thị khi có selection
-    ...(crud.hasSelection ? [
-      {
-        id: "bulk-delete",
-        icon: Trash2,
-        label: `Xóa đã chọn (${crud.selectedIds.length})`,
-        onClick: handleDeleteSelected,
-        variant: "danger" as const,
-      }
-    ] : []),
+  const pageActions = useMemo(() => [
     {
-      id: "download-template",
-      icon: Download,
-      label: "Tải file mẫu",
-      onClick: handleDownloadTemplateWithSample,
+      id: "refresh",
+      icon: RefreshCw,
+      label: isFetching ? "Đang tải..." : "Làm mới",
+      onClick: () => refetch(),
       variant: "secondary" as const,
     },
-    {
-      id: "export-excel",
-      icon: Download,
-      label: "Xuất Excel",
-      onClick: crud.handleExport || (() => console.log("Export không khả dụng")),
-      variant: "success" as const,
-    },
-    {
-      id: "import-excel",
-      icon: Upload,
-      label: "Nhập Excel",
-      onClick: () => fileInputRef.current?.click(),
-      variant: "primary" as const,
-    },
-    {
-      id: "add-new",
-      icon: Plus,
-      label: "Thêm mới",
-      onClick: crud.handleAdd,
-      variant: "primary" as const,
-    },
-  ], [crud.hasSelection, crud.selectedIds.length, handleDeleteSelected, crud.handleAdd, crud.handleExport, handleDownloadTemplateWithSample]);
+  ], [isFetching, refetch]);
 
-  // Loading state
-  if (crud.isLoading) {
-    return <PageLoading message="Đang tải danh sách tài chính thu..." />;
-  }
-
-  // Error state
-  if (crud.error) {
-    return (
-      <ErrorState
-        title="Lỗi tải dữ liệu"
-        message="Không thể tải danh sách tài chính thu. Vui lòng thử lại sau."
-        onRetry={() => window.location.reload()}
-      />
-    );
-  }
-
-  // No family tree state
-  if (!dongHoId) {
-    return <NoFamilyTreeState />;
-  }
-
-  // Column configuration
-  const columns: ColumnConfig<IContributionUp>[] = [
-    {
-      key: "hoTenNguoiDong",
-      label: "Người đóng góp",
-      clickable: true,
-    },
-    {
-      key: "soTien",
-      label: "Số tiền",
-      render: (value) => new Intl.NumberFormat('vi-VN', { 
-        style: 'currency', 
-        currency: 'VND' 
-      }).format(value || 0),
-      align: "right",
-    },
-    {
-      key: "ngayDong",
-      label: "Ngày đóng",
-      render: (value) => value ? new Date(value).toLocaleDateString("vi-VN") : "-",
-    },
-    {
-      key: "phuongThucThanhToan",
-      label: "Phương thức",
-      render: (value) => {
-        const methods: Record<string, string> = {
-          "tien_mat": "Tiền mặt",
-          "chuyen_khoan": "Chuyển khoản",
-          "khac": "Khác"
-        };
-        return methods[value] || value || "-";
-      },
-    },
-    {
-      key: "noiDung",
-      label: "Nội dung",
-      render: (value) => value || "-",
-    },
-  ];
-
-  // Action configuration
-  const customActions: ActionConfig<IContributionUp>[] = [
-    {
-      icon: Edit,
-      label: "Sửa",
-      onClick: crud.handleEdit,
-      color: "blue",
-    },
-    {
-      icon: Trash2,
-      label: "Xóa",
-      onClick: handleDeleteClick,
-      color: "red",
-    },
-  ];
-
-  // Detail modal sections
-  const getDetailSections = (contribution: IContributionUp): DetailSection[] => [
-    {
-      title: "Thông tin cơ bản",
-      fields: [
-        {
-          icon: User,
-          label: "Người đóng góp",
-          value: contribution.hoTenNguoiDong,
-        } as DetailField,
-        {
-          icon: DollarSign,
-          label: "Số tiền",
-          value: contribution.soTien,
-          render: (value) => new Intl.NumberFormat('vi-VN', { 
-            style: 'currency', 
-            currency: 'VND' 
-          }).format(value || 0),
-          colorClass: "text-green-600 font-bold",
-        } as DetailField,
-        {
-          icon: Calendar,
-          label: "Ngày đóng",
-          value: contribution.ngayDong,
-          render: (value) => value ? new Date(value).toLocaleDateString("vi-VN") : "-",
-        } as DetailField,
-      ],
-    },
-    {
-      title: "Chi tiết thanh toán",
-      fields: [
-        {
-          icon: CreditCard,
-          label: "Phương thức thanh toán",
-          value: contribution.phuongThucThanhToan,
-          render: (value) => {
-            const methods: Record<string, string> = {
-              "tien_mat": "Tiền mặt",
-              "chuyen_khoan": "Chuyển khoản", 
-              "khac": "Khác"
-            };
-            return methods[value] || value || "-";
-          },
-        } as DetailField,
-        {
-          icon: FileText,
-          label: "Nội dung",
-          value: contribution.noiDung || "Không có",
-        } as DetailField,
-        {
-          icon: Phone,
-          label: "SĐT người nhập",
-          value: contribution.soDienThoaiNguoiNhap || "Không có",
-        } as DetailField,
-        {
-          icon: MessageSquare,
-          label: "Ghi chú",
-          value: contribution.ghiChu || "Không có",
-        } as DetailField,
-      ],
-    },
-  ];
+  if (isLoading) return <PageLoading message="Đang tải danh sách đóng quỹ..." />;
+  if (!dongHoId)  return <NoFamilyTreeState />;
+  if (error)      return (
+    <ErrorState
+      title="Lỗi tải dữ liệu"
+      message="Không thể tải danh sách đóng quỹ. Vui lòng thử lại."
+      onRetry={() => refetch()}
+    />
+  );
 
   return (
     <PageLayout
-      title="Quản lý tài chính thu"
-      subtitle="Danh sách các khoản thu tài chính"
+      title="Quản lý đóng quỹ"
+      subtitle="Danh sách các giao dịch đóng quỹ trực tuyến của dòng họ"
       icon={DollarSign}
       actions={pageActions}
     >
-        {/* Hidden file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx, .xls"
-          onChange={handleFileInputChange}
-          className="hidden"
-        />
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-5 border border-green-200 flex items-center gap-4">
+          <DollarSign className="h-8 w-8 text-green-600 flex-shrink-0" />
+          <div>
+            <p className="text-sm text-green-600 font-medium">Tổng tiền (trang này)</p>
+            <p className="text-2xl font-bold text-green-800">
+              {Number(totalAmount).toLocaleString("vi-VN")} ₫
+            </p>
+          </div>
+        </div>
 
-        {/* Data Table */}
-        <DataTable
-          data={crud.data}
-          columns={columns}
-          keyField="thuId"
-          pageIndex={crud.pageIndex}
-          pageSize={crud.pageSize}
-          totalRecords={crud.totalRecords}
-          totalPages={crud.totalPages}
-          onPageChange={crud.handlePageChange}
-          onPageSizeChange={crud.handlePageSizeChange}
-          isLoading={crud.isLoading}
-          enableSelection={true}
-          selectedIds={crud.selectedIds as number[]}
-          onSelectAll={crud.handleSelectAll}
-          onSelectOne={crud.handleSelectOne}
-          customActions={customActions}
-          onViewDetail={crud.handleViewDetail}
-          searchValue={crud.searchTerm}
-          onSearchChange={crud.handleSearch}
-          searchPlaceholder="Tìm kiếm theo tên người đóng góp..."
-          emptyMessage="Chưa có khoản thu nào được tạo"
-        />
+        <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-5 border border-blue-200 flex items-center gap-4">
+          <Users className="h-8 w-8 text-blue-600 flex-shrink-0" />
+          <div>
+            <p className="text-sm text-blue-600 font-medium">Số người đóng</p>
+            <p className="text-2xl font-bold text-blue-800">{uniqueContributors}</p>
+          </div>
+        </div>
 
-        {/* Modals */}
-        {crud.isFormOpen && (
-          <ContributionUpModal
-            isOpen={crud.isFormOpen}
-            onClose={crud.handleCloseForm}
-            onSubmit={crud.handleSave}
-            initialData={crud.editingItem}
-            isLoading={crud.isSaving}
-          />
-        )}
+        <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-5 border border-purple-200 flex items-center gap-4">
+          <TrendingUp className="h-8 w-8 text-purple-600 flex-shrink-0" />
+          <div>
+            <p className="text-sm text-purple-600 font-medium">Tổng giao dịch</p>
+            <p className="text-2xl font-bold text-purple-800">{totalRecords}</p>
+          </div>
+        </div>
+      </div>
 
-        {crud.isDetailOpen && crud.selectedItemForDetail && (
-          <DetailModal
-            isOpen={crud.isDetailOpen}
-            onClose={crud.handleCloseDetail}
-            title={crud.selectedItemForDetail.hoTenNguoiDong}
-            subtitle={`Khoản thu ngày ${
-              crud.selectedItemForDetail.ngayDong
-                ? new Date(crud.selectedItemForDetail.ngayDong).toLocaleDateString("vi-VN")
-                : "N/A"
-            }`}
-            badge={new Intl.NumberFormat("vi-VN", {
-              style: "currency",
-              currency: "VND",
-            }).format(crud.selectedItemForDetail.soTien || 0)}
-            gradient="red-yellow"
-            sections={getDetailSections(crud.selectedItemForDetail)}
-            notes={crud.selectedItemForDetail.ghiChu}
-          />
-        )}
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-wrap gap-3 items-end">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Tìm kiếm</label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Tên, nội dung, mã giao dịch..."
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-[#b91c1c]"
+            />
+          </div>
+        </div>
 
-        {/* Error Modal - hiển thị lỗi import */}
-        <ErrorModal
-          isOpen={crud.isErrorModalOpen}
-          onClose={crud.handleCloseErrorModal}
-          title={crud.errorModalTitle}
-          errors={crud.errorModalErrors}
-          warnings={crud.errorModalWarnings}
-          validCount={crud.errorModalValidCount}
-          totalCount={crud.errorModalTotalCount}
-        />
+        <div className="min-w-[160px]">
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Trạng thái</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#b91c1c]"
+          >
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
 
-        {crud.isDeleteOpen && (
-          <DeleteModal
-            isOpen={crud.isDeleteOpen}
-            onClose={crud.handleCloseDelete}
-            onConfirm={crud.handleConfirmDelete}
-            isLoading={crud.isDeleting}
-            title={crud.itemsToDelete.length === 1 ? "Xác nhận xóa khoản thu" : `Xác nhận xóa ${crud.itemsToDelete.length} khoản thu`}
-            message={crud.itemsToDelete.length === 1 ? 
-              "Bạn có chắc chắn muốn xóa khoản thu này? Hành động này không thể hoàn tác." :
-              `Bạn có chắc chắn muốn xóa ${crud.itemsToDelete.length} khoản thu đã chọn? Hành động này không thể hoàn tác.`
-            }
-            items={crud.itemsToDelete}
-          />
-        )}
-      </PageLayout>
-    );
-  }
+        <div className="min-w-[160px]">
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Phương thức</label>
+          <select
+            value={methodFilter}
+            onChange={(e) => setMethodFilter(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#b91c1c]"
+          >
+            {METHOD_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-3 border-b bg-gray-50 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-700">
+            Danh sách giao dịch
+            {isFetching && <span className="ml-2 text-xs text-gray-400 font-normal">Đang cập nhật...</span>}
+          </h3>
+          <span className="text-sm text-gray-500">
+            Hiển thị {filtered.length} / {totalRecords} giao dịch
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px] text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">STT</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Người đóng</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Ngày đóng</th>
+                <th className="px-4 py-3 text-right font-medium text-gray-600">Số tiền</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Phương thức</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Trạng thái</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Nội dung</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                    <DollarSign className="mx-auto mb-2 h-10 w-10 opacity-30" />
+                    <p>Không có giao dịch nào</p>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((t, idx) => {
+                  const badge = STATUS_BADGE[t.trangThai || ""] || {
+                    label: t.trangThai || "-",
+                    className: "bg-gray-100 text-gray-700",
+                  };
+                  return (
+                    <tr key={t.bankTransactionId} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-gray-500">{(currentPage - 1) * pageSize + idx + 1}</td>
+                      <td className="px-4 py-3 font-medium text-gray-800">{t.tenTaiKhoanChuyen || "—"}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={13} className="text-gray-400" />
+                          {t.ngayChuyenKhoan
+                            ? new Date(t.ngayChuyenKhoan).toLocaleDateString("vi-VN")
+                            : "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-green-700">
+                        {Number(t.soTien).toLocaleString("vi-VN")} ₫
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{t.phuongThucThanhToan || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">
+                        {t.noiDungChuyenKhoan || t.maGiaoDichNganHang || "—"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="px-4 py-3 border-t bg-gray-50 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Hiển thị:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+              className="rounded border border-gray-300 bg-white px-2 py-1 text-sm outline-none"
+            >
+              {[10, 20, 50].map((n) => (
+                <option key={n} value={n}>{n} / trang</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+              className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 disabled:opacity-40 hover:bg-gray-100"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm text-gray-600">
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className="rounded border border-gray-300 bg-white p-1.5 text-gray-600 disabled:opacity-40 hover:bg-gray-100"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </PageLayout>
+  );
+}

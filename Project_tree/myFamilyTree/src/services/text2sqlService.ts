@@ -67,6 +67,86 @@ CREATE TABLE loaiquanhe (
   loaiQuanHeId VARCHAR(50) PRIMARY KEY,
   tenLoaiQuanHe VARCHAR(100) NOT NULL      -- Tên loại quan hệ
 );
+
+-- Bảng loại sự kiện
+CREATE TABLE loaisukien (
+  loaiSuKien INT PRIMARY KEY,
+  tenLoaiSuKien VARCHAR(200)               -- 1=Tin Vui, 2=Sự Kiện, 3=Tin Chung
+);
+
+-- Bảng sự kiện
+CREATE TABLE sukien (
+  suKienId VARCHAR(50) PRIMARY KEY,
+  dongHoId VARCHAR(50) NOT NULL,           -- ID dòng họ (bắt buộc filter)
+  tenSuKien VARCHAR(255),                  -- Tên sự kiện
+  ngayDienRa DATE,                         -- Ngày diễn ra
+  gioDienRa TIME,                          -- Giờ diễn ra
+  diaDiem VARCHAR(255),                    -- Địa điểm
+  moTa TEXT,                               -- Mô tả
+  lapLai TINYINT,                          -- Lặp lại hay không
+  loaiSuKien INT,                          -- FK → loaisukien (1=Tin Vui, 2=Sự Kiện, 3=Tin Chung)
+  uuTien INT,                              -- Mức ưu tiên
+  active_flag TINYINT DEFAULT 1,
+  FOREIGN KEY (loaiSuKien) REFERENCES loaisukien(loaiSuKien)
+);
+
+-- Bảng thu tài chính
+CREATE TABLE taichinhthu (
+  thuId INT,
+  dongHoId VARCHAR(50) NOT NULL,           -- ID dòng họ (bắt buộc filter)
+  hoTenNguoiDong VARCHAR(255),             -- Họ tên người đóng tiền
+  ngayDong DATE,                           -- Ngày đóng
+  soTien DECIMAL(18,2),                    -- Số tiền (VND)
+  phuongThucThanhToan VARCHAR(100),        -- Phương thức thanh toán
+  noiDung TEXT,                            -- Nội dung
+  ghiChu TEXT,                             -- Ghi chú
+  ngayTao DATETIME,
+  active_flag TINYINT DEFAULT 1,
+  PRIMARY KEY (thuId, dongHoId)
+);
+
+-- Bảng chi tài chính
+CREATE TABLE taichinhchi (
+  chiId INT,
+  dongHoId VARCHAR(50) NOT NULL,           -- ID dòng họ (bắt buộc filter)
+  ngayChi DATE,                            -- Ngày chi
+  soTien DECIMAL(18,2),                    -- Số tiền (VND)
+  phuongThucThanhToan VARCHAR(100),        -- Phương thức thanh toán
+  noiDung TEXT,                            -- Nội dung chi
+  nguoiNhan VARCHAR(255),                  -- Người nhận tiền
+  ghiChu TEXT,                             -- Ghi chú
+  ngayTao DATETIME,
+  active_flag TINYINT DEFAULT 1,
+  PRIMARY KEY (chiId, dongHoId)
+);
+
+-- Bảng người dùng hệ thống
+CREATE TABLE nguoidung (
+  nguoiDungId VARCHAR(50) PRIMARY KEY,
+  dongHoId VARCHAR(50),                    -- Dòng họ của người dùng
+  full_name VARCHAR(255),                  -- Họ tên đầy đủ
+  email VARCHAR(255),
+  phone VARCHAR(20),
+  active_flag TINYINT DEFAULT 1
+);
+
+-- Bảng giao dịch đóng quỹ online (VNPay, Momo, chuyển khoản)
+CREATE TABLE bank_transaction (
+  bankTransactionId VARCHAR(50) PRIMARY KEY,
+  dongHoId VARCHAR(50) NOT NULL,           -- ID dòng họ (bắt buộc filter)
+  nguoiDungId VARCHAR(50),                 -- FK → nguoidung (người thực hiện giao dịch)
+  soTien DECIMAL(18,2) NOT NULL,           -- Số tiền đóng quỹ (VND)
+  phuongThucThanhToan VARCHAR(50),         -- momo, vnpay, bank_transfer
+  tenTaiKhoanChuyen VARCHAR(100),          -- Tên người đóng quỹ (từ ngân hàng)
+  soTaiKhoanChuyen VARCHAR(50),            -- Số tài khoản người chuyển
+  ngayChuyenKhoan DATETIME,               -- Ngày chuyển khoản
+  ngayXacNhan DATETIME,                   -- Ngày xác nhận (NULL = chưa xác nhận)
+  trangThai VARCHAR(50),                  -- pending, completed, failed, verified
+  noiDungChuyenKhoan VARCHAR(255),        -- Nội dung chuyển khoản
+  ghiChu TEXT,
+  active_flag TINYINT DEFAULT 1,
+  FOREIGN KEY (nguoiDungId) REFERENCES nguoidung(nguoiDungId)
+);
 `;
 
 // Few-shot examples từ dataset
@@ -116,11 +196,48 @@ ${DATABASE_SCHEMA}
 7. ✅ Với câu hỏi về người cụ thể, dùng hoTen = 'Tên đầy đủ'
 8. ✅ Khi đếm con: dùng chaId hoặc meId tùy giới tính
 9. ✅ Khi tìm anh chị em: cùng chaId hoặc meId
+10. ✅ Bảng sukien: filter dongHoId, loaiSuKien (1=Tin Vui, 2=Sự Kiện, 3=Tin Chung)
+11. ✅ Bảng taichinhthu: thu tiền từ thành viên, filter dongHoId
+12. ✅ Bảng taichinhchi: chi tiền ra ngoài, filter dongHoId
+13. ✅ Khi tính tổng tiền dùng SUM(soTien), tổng thu - tổng chi = số dư
+14. ✅ Bảng bank_transaction: giao dịch đóng quỹ online, chỉ tính trangThai = 'completed' hoặc 'verified' là hợp lệ
+15. ✅ "Tổng tiền đóng quỹ" = SUM(soTien) FROM bank_transaction WHERE trangThai IN ('completed','verified')
+16. ✅ Khi cần tên người dùng từ bank_transaction: JOIN nguoidung ON bank_transaction.nguoiDungId = nguoidung.nguoiDungId, lấy full_name
 
 ### VÍ DỤ THAM KHẢO
-${FEW_SHOT_EXAMPLES.slice(0, 10)
+${FEW_SHOT_EXAMPLES.slice(0, 8)
   .map((ex) => `Q: ${ex.question}\nSQL: ${ex.sql.replace(/dongHoId = \?/g, `dongHoId = '${dongHoId}'`)}`)
   .join("\n\n")}
+
+Q: Có bao nhiêu sự kiện?
+SQL: SELECT COUNT(*) FROM sukien WHERE dongHoId = '${dongHoId}' AND active_flag = 1
+
+Q: Danh sách sự kiện sắp tới
+SQL: SELECT tenSuKien, ngayDienRa, gioDienRa, diaDiem FROM sukien WHERE dongHoId = '${dongHoId}' AND active_flag = 1 AND ngayDienRa >= CURDATE() ORDER BY ngayDienRa ASC
+
+Q: Tổng tiền thu được
+SQL: SELECT SUM(soTien) FROM taichinhthu WHERE dongHoId = '${dongHoId}' AND active_flag = 1
+
+Q: Tổng tiền chi
+SQL: SELECT SUM(soTien) FROM taichinhchi WHERE dongHoId = '${dongHoId}' AND active_flag = 1
+
+Q: Số dư quỹ dòng họ
+SQL: SELECT (SELECT COALESCE(SUM(soTien),0) FROM taichinhthu WHERE dongHoId = '${dongHoId}' AND active_flag = 1) - (SELECT COALESCE(SUM(soTien),0) FROM taichinhchi WHERE dongHoId = '${dongHoId}' AND active_flag = 1) AS so_du
+
+Q: Danh sách người đã đóng quỹ
+SQL: SELECT hoTenNguoiDong, ngayDong, soTien, noiDung FROM taichinhthu WHERE dongHoId = '${dongHoId}' AND active_flag = 1 ORDER BY ngayDong DESC
+
+Q: Tổng tiền đóng quỹ online
+SQL: SELECT SUM(soTien) AS tong_dong_quy FROM bank_transaction WHERE dongHoId = '${dongHoId}' AND trangThai IN ('completed','verified') AND active_flag = 1
+
+Q: Có bao nhiêu người đã đóng quỹ online?
+SQL: SELECT COUNT(DISTINCT tenTaiKhoanChuyen) AS so_nguoi_dong FROM bank_transaction WHERE dongHoId = '${dongHoId}' AND trangThai IN ('completed','verified') AND active_flag = 1
+
+Q: Danh sách giao dịch đóng quỹ
+SQL: SELECT nd.full_name, bt.tenTaiKhoanChuyen, bt.soTien, bt.ngayChuyenKhoan, bt.phuongThucThanhToan, bt.trangThai FROM bank_transaction bt LEFT JOIN nguoidung nd ON bt.nguoiDungId = nd.nguoiDungId WHERE bt.dongHoId = '${dongHoId}' AND bt.active_flag = 1 ORDER BY bt.ngayChuyenKhoan DESC
+
+Q: Tổng tiền đóng quỹ tháng này
+SQL: SELECT SUM(soTien) AS tong_thang_nay FROM bank_transaction WHERE dongHoId = '${dongHoId}' AND trangThai IN ('completed','verified') AND active_flag = 1 AND MONTH(ngayChuyenKhoan) = MONTH(CURDATE()) AND YEAR(ngayChuyenKhoan) = YEAR(CURDATE())
 
 ### CÂU HỎI CỦA NGƯỜI DÙNG
 Q: ${question}
@@ -292,27 +409,30 @@ export class Text2SQLService {
       let usedAPI = "";
 
       // 2. Gọi AI API (ưu tiên GROQ, fallback Gemini)
-      try {
-        if (this.geminiModel) {
-          console.log("🔄 Falling back to Gemini API...");
-          generatedSQL = await this.callGeminiAPI(prompt);
-          usedAPI = "Gemini";
-          console.log("✅ Gemini response:", generatedSQL);
-        } else {
-          throw new Error("Both GROQ and Gemini APIs failed");
-        }
-      } catch (groqError: any) {
-        console.warn("⚠️ Gemini API failed:", groqError.message);
-
-        if (this.groq) {
+      if (this.groq) {
+        try {
           console.log("🤖 Calling GROQ API...");
           generatedSQL = await this.callGroqAPI(prompt);
           usedAPI = "GROQ";
           console.log("✅ GROQ response:", generatedSQL);
-        } else {
-          throw new Error("GROQ not available");
+        } catch (groqError: any) {
+          console.warn("⚠️ GROQ API failed:", groqError.message);
+          if (this.geminiModel) {
+            console.log("🔄 Falling back to Gemini API...");
+            generatedSQL = await this.callGeminiAPI(prompt);
+            usedAPI = "Gemini";
+            console.log("✅ Gemini response:", generatedSQL);
+          } else {
+            throw groqError;
+          }
         }
-        
+      } else if (this.geminiModel) {
+        console.log("🔄 Calling Gemini API...");
+        generatedSQL = await this.callGeminiAPI(prompt);
+        usedAPI = "Gemini";
+        console.log("✅ Gemini response:", generatedSQL);
+      } else {
+        throw new Error("No AI API available");
       }
 
       // 3. Parse SQL

@@ -82,16 +82,16 @@ function GenealogyContent() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-stone-100 font-dancing overflow-hidden">
+    <div className="flex flex-col h-screen w-full bg-stone-100 font-dancing">
       {/* HEADER */}
-      <div className="flex-none z-50 shadow-md relative">
+      <div className="flex-none shadow-md">
         <Header activeView={activeView} onNavigate={setActiveView} />
       </div>
 
       {/* MAIN */}
-      <main className="flex-1 relative w-full bg-stone-50 bg-[#ede5b7]">
+      <main className="flex-1 relative w-full overflow-hidden bg-[#ede5b7]">
         {/* CONTENT */}
-        <div className="absolute inset-0 w-full h-full z-10 bg-[#ede5b7]">
+        <div className="absolute inset-0 w-full h-full bg-[#ede5b7]">
 
           {activeView === ViewMode.PHA_KY && (
             <div className="w-full h-full overflow-y-auto p-4 md:p-8">

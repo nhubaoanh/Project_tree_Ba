@@ -19,6 +19,7 @@ export interface IEvent {
   full_name: string;
   ngayBatDau?: Date;
   ngayKetThuc?: Date;
+  anhUrl?: string;
 }
 
 export interface ISuKien extends IEvent {}

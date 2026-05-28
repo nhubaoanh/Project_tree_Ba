@@ -42,7 +42,7 @@ export class suKienRespository {
   async createSuKien(sukien: suKien): Promise<any> {
     try {
       const sql =
-        "CALL InsertEvent(?,?,?,?,?,?,?,?,?,?,?, @err_code, @err_msg)";
+        "CALL InsertEvent(?,?,?,?,?,?,?,?,?,?,?,?, @err_code, @err_msg)";
       await this.db.query(sql, [
         sukien.suKienId,
         sukien.dongHoId,
@@ -55,6 +55,7 @@ export class suKienRespository {
         sukien.nguoiTaoId,
         sukien.loaiSuKien,
         sukien.uuTien,
+        sukien.anhUrl || null,
       ]);
       console.log("sukien created with ID:", sukien.suKienId);
       return true;
@@ -67,7 +68,7 @@ export class suKienRespository {
   async updateSuKien(sukien: suKien): Promise<any> {
     try {
       const sql =
-        "CALL UpdateEvent(?,?,?,?,?,?,?,?,?,?,?, @err_code, @err_msg)";
+        "CALL UpdateEvent(?,?,?,?,?,?,?,?,?,?,?,?, @err_code, @err_msg)";
       await this.db.query(sql, [
         sukien.suKienId,
         sukien.dongHoId,
@@ -80,6 +81,7 @@ export class suKienRespository {
         sukien.loaiSuKien,
         sukien.uuTien,
         sukien.lu_user_id,
+        sukien.anhUrl || null,
       ]);
       return true;
     } catch (error: any) {

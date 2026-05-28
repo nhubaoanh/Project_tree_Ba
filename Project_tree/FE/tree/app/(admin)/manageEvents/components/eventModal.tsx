@@ -89,6 +89,7 @@ export const EventModal: React.FC<EventModalProps> = ({
         gioDienRa: initialData?.gioDienRa,
         diaDiem: initialData?.diaDiem || "",
         moTa: initialData?.moTa || "",
+        anhUrl: initialData?.anhUrl || "",
         dongHoId: initialData?.dongHoId || userDongHoId || "",
         loaiSuKien: initialData?.loaiSuKien ?? 1,
         uuTien: initialData?.uuTien ?? 2,
@@ -361,6 +362,29 @@ export const EventModal: React.FC<EventModalProps> = ({
             error={touched.diaDiem ? errors.diaDiem : null}
             placeholder="VD: Nhà thờ họ, xã ABC, huyện XYZ"
           />
+
+          {/* Row 4b: URL ảnh sự kiện */}
+          <InputField
+            label="Ảnh sự kiện (URL)"
+            name="anhUrl"
+            type="url"
+            value={formData.anhUrl || ""}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            placeholder="VD: https://example.com/anh-su-kien.jpg"
+          />
+          {formData.anhUrl && (
+            <div className="rounded overflow-hidden border border-[#d4af37]/40 max-h-40">
+              <img
+                src={formData.anhUrl}
+                alt="Preview"
+                className="w-full h-40 object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            </div>
+          )}
 
           {/* Row 5: Ưu tiên + Lặp lại */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

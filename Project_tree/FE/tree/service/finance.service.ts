@@ -4,60 +4,52 @@ import {
   ApiResult,
   IUserSearch,
 } from "@/types/Notification";
+import { IContributionUp } from "@/types/contribuitionUp";
+import { IContributionDown } from "@/types/contribuitionDown";
+import { searchContributionUp, createContributionUp, deleteContributionUp } from "./contribuitionUp.service";
+import { searchContributionDown, createContributionDown, deleteContributionDown } from "./contribuitionDown.service";
+import storage from "@/utils/storage";
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const mapThuToTransaction = (item: IContributionUp): ITransaction => ({
+  giaoDichId: `THU-${item.thuId}`,
+  loaiGiaoDich: "THU",
+  soTien: Number(item.soTien),
+  moTa: item.noiDung || "",
+  ngayGiaoDich: item.ngayDong ? new Date(item.ngayDong).toISOString() : new Date().toISOString(),
+  nguoiThucHien: item.hoTenNguoiDong || "",
+  hangMuc: item.phuongThucThanhToan || "",
+});
 
-let MOCK_TRANSACTIONS: ITransaction[] = [
-  {
-    giaoDichId: "GD_01",
-    loaiGiaoDich: "THU",
-    soTien: 5000000,
-    moTa: "Ông Nguyễn Văn A đóng góp quỹ xây dựng",
-    ngayGiaoDich: new Date().toISOString(),
-    nguoiThucHien: "Thủ Quỹ",
-    hangMuc: "Đóng góp",
-  },
-  {
-    giaoDichId: "GD_02",
-    loaiGiaoDich: "CHI",
-    soTien: 2000000,
-    moTa: "Mua hoa quả cúng rằm tháng Giêng",
-    ngayGiaoDich: new Date(Date.now() - 86400000).toISOString(),
-    nguoiThucHien: "Trưởng Tộc",
-    hangMuc: "Lễ tết",
-  },
-  {
-    giaoDichId: "GD_03",
-    loaiGiaoDich: "CHI",
-    soTien: 15000000,
-    moTa: "Sửa chữa cổng tam quan",
-    ngayGiaoDich: new Date(Date.now() - 100000000).toISOString(),
-    nguoiThucHien: "Ban Kiến Thiết",
-    hangMuc: "Tu bổ",
-  },
-];
+const mapChiToTransaction = (item: IContributionDown): ITransaction => ({
+  giaoDichId: `CHI-${item.chiId}`,
+  loaiGiaoDich: "CHI",
+  soTien: Number(item.soTien),
+  moTa: item.noiDung || "",
+  ngayGiaoDich: item.ngayChi ? new Date(item.ngayChi).toISOString() : new Date().toISOString(),
+  nguoiThucHien: item.nguoiNhan || "",
+  hangMuc: item.phuongThucThanhToan || "",
+});
 
 export const getTransactions = async (
   params: IUserSearch
 ): Promise<ApiResult<PaginatedResponse<ITransaction>>> => {
-  await delay(500);
-  let filtered = [...MOCK_TRANSACTIONS];
+  const dongHoId = params.dongHoId || "";
 
-  if (params.search_content) {
-    const lower = params.search_content.toLowerCase();
-    filtered = filtered.filter(
-      (t) =>
-        t.moTa.toLowerCase().includes(lower) ||
-        t.hangMuc.toLowerCase().includes(lower)
-    );
-  }
+  const [thuRes, chiRes] = await Promise.all([
+    searchContributionUp({ pageIndex: 1, pageSize: 999, search_content: params.search_content, dongHoId }),
+    searchContributionDown({ pageIndex: 1, pageSize: 999, search_content: params.search_content, dongHoId }),
+  ]);
 
-  const totalRecords = filtered.length;
-  const startIndex = (params.pageIndex - 1) * params.pageSize;
-  const paginatedData = filtered.slice(
-    startIndex,
-    startIndex + params.pageSize
+  const thuList: ITransaction[] = (thuRes?.data || []).map(mapThuToTransaction);
+  const chiList: ITransaction[] = (chiRes?.data || []).map(mapChiToTransaction);
+
+  const all = [...thuList, ...chiList].sort(
+    (a, b) => new Date(b.ngayGiaoDich).getTime() - new Date(a.ngayGiaoDich).getTime()
   );
+
+  const totalRecords = all.length;
+  const startIndex = (params.pageIndex - 1) * params.pageSize;
+  const paginatedData = all.slice(startIndex, startIndex + params.pageSize);
 
   return {
     code: 200,
@@ -67,23 +59,28 @@ export const getTransactions = async (
       totalRecords,
       pageIndex: params.pageIndex,
       pageSize: params.pageSize,
-      totalPages: Math.ceil(totalRecords / params.pageSize),
+      totalPages: Math.ceil(totalRecords / params.pageSize) || 1,
     },
   };
 };
 
-export const getFinanceStats = async (): Promise<
-  ApiResult<{ thu: number; chi: number; ton: number }>
-> => {
-  await delay(300);
-  const thu = MOCK_TRANSACTIONS.filter((t) => t.loaiGiaoDich === "THU").reduce(
-    (acc, curr) => acc + curr.soTien,
+export const getFinanceStats = async (
+  dongHoId: string
+): Promise<ApiResult<{ thu: number; chi: number; ton: number }>> => {
+  const [thuRes, chiRes] = await Promise.all([
+    searchContributionUp({ pageIndex: 1, pageSize: 999, dongHoId }),
+    searchContributionDown({ pageIndex: 1, pageSize: 999, dongHoId }),
+  ]);
+
+  const thu = (thuRes?.data || []).reduce(
+    (acc: number, curr: IContributionUp) => acc + Number(curr.soTien),
     0
   );
-  const chi = MOCK_TRANSACTIONS.filter((t) => t.loaiGiaoDich === "CHI").reduce(
-    (acc, curr) => acc + curr.soTien,
+  const chi = (chiRes?.data || []).reduce(
+    (acc: number, curr: IContributionDown) => acc + Number(curr.soTien),
     0
   );
+
   return {
     code: 200,
     message: "Success",
@@ -92,22 +89,65 @@ export const getFinanceStats = async (): Promise<
 };
 
 export const createTransaction = async (
-  trans: Partial<ITransaction>
+  trans: Partial<ITransaction> & { dongHoId: string }
 ): Promise<ApiResult<ITransaction>> => {
-  await delay(300);
-  const newItem: ITransaction = {
-    ...trans,
-    giaoDichId: `GD_${Date.now()}`,
-    ngayGiaoDich: trans.ngayGiaoDich || new Date().toISOString(),
-  } as ITransaction;
-  MOCK_TRANSACTIONS.unshift(newItem);
-  return { code: 200, message: "Success", data: newItem };
+  const user = storage.getUser();
+  const nguoiNhapId = user?.nguoiDungId || "";
+
+  if (trans.loaiGiaoDich === "THU") {
+    const payload: IContributionUp = {
+      thuId: 0,
+      dongHoId: trans.dongHoId,
+      hoTenNguoiDong: trans.nguoiThucHien || "",
+      ngayDong: trans.ngayGiaoDich ? new Date(trans.ngayGiaoDich) : new Date(),
+      soTien: trans.soTien || 0,
+      phuongThucThanhToan: trans.hangMuc || "",
+      noiDung: trans.moTa || "",
+      ghiChu: "",
+      nguoiNhapId,
+      ngayTao: new Date(),
+      active_flag: 1,
+      lu_updated: new Date(),
+      lu_user_id: nguoiNhapId,
+    };
+    const res = await createContributionUp(payload);
+    const created: ITransaction = mapThuToTransaction({ ...payload, thuId: res?.data?.thuId || 0 });
+    return { code: 200, message: "Success", data: created };
+  } else {
+    const payload: IContributionDown = {
+      chiId: 0,
+      dongHoId: trans.dongHoId,
+      ngayChi: trans.ngayGiaoDich ? new Date(trans.ngayGiaoDich) : new Date(),
+      soTien: trans.soTien || 0,
+      phuongThucThanhToan: trans.hangMuc || "",
+      noiDung: trans.moTa || "",
+      nguoiNhan: trans.nguoiThucHien || "",
+      ghiChu: "",
+      nguoiNhapId,
+      ngayTao: new Date(),
+      active_flag: 1,
+      lu_updated: new Date(),
+      lu_user_id: nguoiNhapId,
+    };
+    const res = await createContributionDown(payload);
+    const created: ITransaction = mapChiToTransaction({ ...payload, chiId: res?.data?.chiId || 0 });
+    return { code: 200, message: "Success", data: created };
+  }
 };
 
 export const deleteTransaction = async (
   id: string
 ): Promise<ApiResult<boolean>> => {
-  await delay(300);
-  MOCK_TRANSACTIONS = MOCK_TRANSACTIONS.filter((t) => t.giaoDichId !== id);
+  const user = storage.getUser();
+  const userId = user?.nguoiDungId || "";
+
+  if (id.startsWith("THU-")) {
+    const thuId = Number(id.replace("THU-", ""));
+    await deleteContributionUp([{ thuId }], userId);
+  } else if (id.startsWith("CHI-")) {
+    const chiId = Number(id.replace("CHI-", ""));
+    await deleteContributionDown([{ chiId }], userId);
+  }
+
   return { code: 200, message: "Success", data: true };
 };

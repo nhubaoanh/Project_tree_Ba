@@ -12,5 +12,6 @@ export interface suKien {
     lu_updated : Date,
     loaiSuKien: number,
     uuTien: number,
-    lu_user_id: string
+    lu_user_id: string,
+    anhUrl: string,
 }

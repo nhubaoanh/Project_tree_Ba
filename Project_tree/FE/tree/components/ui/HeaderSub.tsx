@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay pointer-events-none"></div>
 
         <div className="relative z-10 h-full grid grid-cols-3 gap-2 items-center px-4 md:px-8 max-w-7xl mx-auto">
-        <div className="flex justify-start items-center opacity-80 hover:opacity-100 transition-opacity h-full">
+        <div className="flex justify-start items-center opacity-80 h-full pointer-events-none select-none overflow-hidden">
           <Image
             src="/images/en.png"
             alt="Dao"
@@ -70,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
           />
         </div>
         <div className="flex flex-col items-center justify-center h-full pt-2">
-          <div className="mb-13 transform hover:scale-105 transition-transform duration-500">
+          <div className="mb-13">
             <Image
               src="/images/logo1.png"
               alt="Dao"
@@ -79,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
               quality={80}
             />
           </div>
-          <nav className="flex flex-wrap justify-center text-[17px] items-center gap-3 md:gap-4 w-full absolute bottom-2">
+          <nav className="flex flex-wrap justify-center text-[17px] items-center gap-3 md:gap-4 w-full absolute bottom-2 z-20">
             {navItems.map((item) => (
               <NavButton
                 key={item.key}
@@ -90,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
             ))}
           </nav>
         </div>
-        <div className="flex justify-end items-center opacity-80 hover:opacity-100 transition-opacity h-full">
+        <div className="flex justify-end items-center opacity-80 h-full pointer-events-none select-none overflow-hidden">
           <Image
             src="/images/backgroudrignt.png"
             alt="Dao"

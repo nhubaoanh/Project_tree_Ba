@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Calendar, Clock, MapPin, Tag, AlertTriangle, User, FileText } from "lucide-react";
+import { Calendar, Clock, MapPin, Tag, AlertTriangle, User, FileText, Image } from "lucide-react";
 import { IEvent } from "@/types/event";
 import { DetailModal, DetailSection } from "@/components/shared";
 
@@ -89,9 +89,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           value: event.moTa || "-",
         },
         {
+          icon: Image,
+          label: "Ảnh sự kiện",
+          value: event.anhUrl || "-",
+        },
+        {
           icon: User,
           label: "Người tạo",
-          value: event.nguoiTaoId || "-",
+          value: event.full_name || event.nguoiTaoId || "-",
         },
       ],
     },

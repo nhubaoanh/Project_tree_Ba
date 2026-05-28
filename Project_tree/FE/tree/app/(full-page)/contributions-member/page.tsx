@@ -163,21 +163,6 @@ export default function ContributionsPage() {
         </label>
 
         <label className="block">
-          <span className="text-sm font-semibold text-gray-700">Trạng thái</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-            className="mt-2 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#8b5e3c]"
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
           <span className="text-sm font-semibold text-gray-700">Phương thức</span>
           <select
             value={methodFilter}

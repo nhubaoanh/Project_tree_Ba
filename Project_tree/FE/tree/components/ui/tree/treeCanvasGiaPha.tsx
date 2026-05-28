@@ -88,11 +88,6 @@ interface RState {
 // ─────────────────────────────────────────────────────────────────
 const NW = 41;
 const NH = 59;
-const SIBLING_GAP_H = 10;
-const CHILD_CLUSTER_GAP = 2;
-const GEN_PADDING = 5;
-const GEN_VERTICAL_GAP = 50;
-const CHILD_Y_OFFSET = 2;
 const SCALE_LAN = 1.6;
 
 const defaultAvatar = new Image();
@@ -117,11 +112,15 @@ deadBg.src = "../images/node_background_dead.jpg";
 
 const maleBg = new Image();
 maleBg.crossOrigin = "anonymous";
-maleBg.src = "../images/node_background_male.png";
+maleBg.src = "../images/node_background_dead.jpg";
 
 const femaleBg = new Image();
 femaleBg.crossOrigin = "anonymous";
-femaleBg.src = "../images/node_background_female.png";
+femaleBg.src = "../images/node_background_male.png";
+
+const wifeBg = new Image();
+wifeBg.crossOrigin = "anonymous";
+wifeBg.src = "../images/node_background_female.png";
 
 const primaryBg = new Image();
 primaryBg.crossOrigin = "anonymous";
@@ -150,26 +149,33 @@ const getNodeSizeGen = (gen: number) => {
 function normalize(raw: RawNode[]) {
     const spouseOf: Record<number, Set<number>> = {};
     raw.forEach(d => {
-        const id = d.thanhVienId;
+        const id = Number(d.thanhVienId);
         if (!spouseOf[id]) spouseOf[id] = new Set();
-        if (d.voId) {
-            spouseOf[id].add(d.voId);
-            if (!spouseOf[d.voId]) spouseOf[d.voId] = new Set();
-            spouseOf[d.voId].add(id);
+        if (d.voId != null) {
+            const spouseId = Number(d.voId);
+            spouseOf[id].add(spouseId);
+            if (!spouseOf[spouseId]) spouseOf[spouseId] = new Set();
+            spouseOf[spouseId].add(id);
         }
-        if (d.chongId) {
-            spouseOf[id].add(d.chongId);
-            if (!spouseOf[d.chongId]) spouseOf[d.chongId] = new Set();
-            spouseOf[d.chongId].add(id);
+        if (d.chongId != null) {
+            const spouseId = Number(d.chongId);
+            spouseOf[id].add(spouseId);
+            if (!spouseOf[spouseId]) spouseOf[spouseId] = new Set();
+            spouseOf[spouseId].add(id);
         }
     });
 
     return raw.map(d => ({
         ...d,
-        id: d.thanhVienId,
-        fid: d.chaId || null,
-        mid: d.meId || null,
-        pids: Array.from(spouseOf[d.thanhVienId] || []),
+        id: Number(d.thanhVienId),
+        thanhVienId: Number(d.thanhVienId),
+        chaId: d.chaId != null ? Number(d.chaId) : undefined,
+        meId: d.meId != null ? Number(d.meId) : undefined,
+        voId: d.voId != null ? Number(d.voId) : undefined,
+        chongId: d.chongId != null ? Number(d.chongId) : undefined,
+        fid: d.chaId != null ? Number(d.chaId) : null,
+        mid: d.meId != null ? Number(d.meId) : null,
+        pids: Array.from(spouseOf[Number(d.thanhVienId)] || []),
         toaDoX: d.toaDoX || 0,
         toaDoY: d.toaDoY || 0,
     })) as RawNode[];
@@ -203,88 +209,163 @@ function layout(nodes: (RawNode & { fid: number | null; mid: number | null; pids
     }
 
     const gens = Object.keys(genMap).map(Number).sort((a, b) => a - b);
+
+    // Khoảng cách giữa 2 node vợ chồng trong cùng 1 unit
+    const SPOUSE_GAP = 8;
+    // Khoảng cách giữa 2 anh/chị/em trong cùng nhóm cha mẹ
+    const SIBLING_GAP = 12;
+    // Khoảng cách giữa 2 nhóm cha mẹ khác nhau trong cùng đời
+    const GROUP_GAP = 30;
+    // Khoảng cách dọc giữa các đời
+    const GEN_V_GAP = 70;
+
+    // Tính tổng chiều rộng của 1 unit (danh sách id đặt liền nhau)
+    const calcUnitWidth = (ids: number[]) =>
+        ids.reduce((s, id) => s + (map[id].w || NW), 0) + Math.max(0, ids.length - 1) * SPOUSE_GAP;
+
     let currentY = 20;
 
-    gens.forEach(gen => {
-        const genNodeIds = genMap[gen];
-        let avgH = NH;
-        if (genNodeIds.length) {
-            avgH = genNodeIds.reduce((sum, nid) => sum + (map[nid].h || NH), 0) / genNodeIds.length;
-        }
-        const genPad = GEN_PADDING * (avgH / NH);
-        const baseYForGen = currentY + genPad + GEN_VERTICAL_GAP;
+    gens.forEach((gen, genIndex) => {
+        const genIds = genMap[gen];
+        const nodeH = (getNodeSizeGen(gen) || { NW, NH }).NH;
 
-        let currentX = 0;
-        genNodeIds.sort((a, b) => a - b);
-        genNodeIds.forEach(id => {
-            const n = map[id];
-            n.x = currentX;
-            n.y = baseYForGen;
-            currentX += n.w + 5;
-        });
+        if (genIndex === 0) {
+            // ── Đời gốc: xếp đối xứng quanh x = 0 ──
+            // Gom vợ/chồng thành từng unit, rồi xếp các unit đối xứng
+            const placed = new Set<number>();
+            const units: number[][] = [];
+            genIds.forEach(id => {
+                if (placed.has(id)) return;
+                placed.add(id);
+                const spouses = (map[id].pids || []).filter((s: number) => genIds.includes(s) && !placed.has(s));
+                spouses.forEach((s: number) => placed.add(s));
+                units.push([id, ...spouses]);
+            });
 
-        genNodeIds.forEach(id => {
-            const n = map[id];
-            if (n.pids && n.pids.length > 0) {
-                const spouses = n.pids.map((sid: number) => map[sid]).filter((s: any) => s && s.id !== n.id);
-                spouses.sort((a: any, b: any) => a.id - b.id);
-                let spouseX = n.x + n.w + 5;
-                spouses.forEach((s: any) => {
-                    s.x = spouseX;
-                    s.y = n.y;
-                    spouseX += s.w + 5;
+            const uWidths = units.map(u => calcUnitWidth(u));
+            const totalW = uWidths.reduce((s, w) => s + w, 0) + Math.max(0, units.length - 1) * GROUP_GAP;
+            let x = -totalW / 2;
+            units.forEach((unit, ui) => {
+                unit.forEach((id, j) => {
+                    map[id].x = x;
+                    map[id].y = currentY;
+                    x += (map[id].w || NW) + (j < unit.length - 1 ? SPOUSE_GAP : 0);
+                });
+                if (ui < units.length - 1) x += GROUP_GAP;
+            });
+        } else {
+            // ── Các đời con: nhóm theo cặp cha mẹ, căn giữa dưới cha mẹ, rồi căn cả hàng về x = 0 ──
+            const genSet = new Set(genIds);
+
+            // Phân loại: node có cha/mẹ trong map = con ruột; không có = vợ/chồng ngoài gia phả
+            const bioIds = genIds.filter(id => {
+                const n = map[id];
+                const f = n.fid, m = n.mid;
+                return (f != null && map[f]) || (m != null && map[m]);
+            });
+            const outsiderSet = new Set(genIds.filter(id => !bioIds.includes(id)));
+            const placed = new Set<number>();
+
+            // Nhóm các con ruột theo key của cặp cha-mẹ
+            const parentGroups: Record<string, number[]> = {};
+            bioIds.forEach(id => {
+                const n = map[id];
+                const f = n.fid, m = n.mid;
+                let key: string;
+                if (f != null && m != null && map[f] && map[m]) {
+                    key = `${Math.min(f, m)}-${Math.max(f, m)}`;
+                } else {
+                    const p = f ?? m;
+                    key = p != null ? `single-${p}` : `orphan-${id}`;
+                }
+                (parentGroups[key] = parentGroups[key] || []).push(id);
+            });
+
+            // Xây dựng danh sách nhóm để xếp vị trí
+            const groups: { idealCx: number; units: number[][]; totalW: number }[] = [];
+
+            Object.entries(parentGroups).forEach(([key, ids]) => {
+                // Tâm lý tưởng = trung điểm của cha mẹ
+                let idealCx = 0;
+                if (key.startsWith('single-')) {
+                    const pid = +key.slice(7);
+                    const p = map[pid];
+                    if (p) idealCx = p.x + (p.w || NW) / 2;
+                } else if (!key.startsWith('orphan-')) {
+                    const [a, b] = key.split('-').map(Number);
+                    const pa = map[a], pb = map[b];
+                    if (pa && pb) idealCx = ((pa.x + (pa.w || NW) / 2) + (pb.x + (pb.w || NW) / 2)) / 2;
+                }
+
+                // Mỗi con ruột + vợ/chồng ngoài của họ tạo thành 1 sub-unit
+                const units: number[][] = [];
+                ids.sort((a, b) => a - b).forEach(bioId => {
+                    if (placed.has(bioId)) return;
+                    placed.add(bioId);
+                    const spouses = (map[bioId].pids || []).filter((s: number) =>
+                        genSet.has(s) && !placed.has(s) && outsiderSet.has(s)
+                    );
+                    spouses.forEach((s: number) => placed.add(s));
+                    units.push([bioId, ...spouses]);
+                });
+                if (!units.length) return;
+
+                let totalW = 0;
+                units.forEach((u, ui) => {
+                    totalW += calcUnitWidth(u);
+                    if (ui < units.length - 1) totalW += SIBLING_GAP;
+                });
+                groups.push({ idealCx, units, totalW });
+            });
+
+            // Sắp xếp nhóm từ trái sang phải
+            groups.sort((a, b) => a.idealCx - b.idealCx);
+
+            // Vị trí khởi đầu: căn giữa mỗi nhóm dưới cha mẹ
+            const startX = groups.map(g => g.idealCx - g.totalW / 2);
+
+            // Giải quyết chồng lấn từ trái sang phải
+            for (let i = 1; i < startX.length; i++) {
+                const minStart = startX[i - 1] + groups[i - 1].totalW + GROUP_GAP;
+                if (startX[i] < minStart) startX[i] = minStart;
+            }
+
+            // Căn cả hàng đời này về x = 0 (đối xứng qua trục primaryBg)
+            if (groups.length) {
+                const rowL = startX[0];
+                const rowR = startX[groups.length - 1] + groups[groups.length - 1].totalW;
+                const shift = -((rowL + rowR) / 2);
+                startX.forEach((_, i) => { startX[i] += shift; });
+            }
+
+            // Gán tọa độ
+            groups.forEach((g, gi) => {
+                let x = startX[gi];
+                g.units.forEach((unit, ui) => {
+                    unit.forEach((id, j) => {
+                        map[id].x = x;
+                        map[id].y = currentY;
+                        x += (map[id].w || NW) + (j < unit.length - 1 ? SPOUSE_GAP : 0);
+                    });
+                    if (ui < g.units.length - 1) x += SIBLING_GAP;
+                });
+            });
+
+            // Đặt các node chưa được xếp (không có cha mẹ trong map) vào giữa hàng
+            const unplaced = genIds.filter(id => !placed.has(id));
+            if (unplaced.length) {
+                const totalW = unplaced.reduce((s, id) => s + (map[id].w || NW), 0) + Math.max(0, unplaced.length - 1) * SIBLING_GAP;
+                let x = -totalW / 2;
+                unplaced.forEach(id => {
+                    map[id].x = x;
+                    map[id].y = currentY;
+                    x += (map[id].w || NW) + SIBLING_GAP;
                 });
             }
-        });
-
-        for (let i = 0; i < genNodeIds.length; i++) {
-            const id = genNodeIds[i];
-            const n = map[id];
-            let maxX = n.x + n.w;
-            if (n.pids && n.pids.length > 0) {
-                const spouses = n.pids.map((sid: number) => map[sid]).filter((s: any) => s && s.id !== n.id);
-                spouses.forEach((s: any) => { maxX = Math.max(maxX, s.x + s.w); });
-            }
-            const nextId = genNodeIds[i + 1];
-            if (nextId) {
-                const nextN = map[nextId];
-                if (maxX + 5 > nextN.x) {
-                    const shift = maxX + 5 - nextN.x;
-                    for (let j = i + 1; j < genNodeIds.length; j++) {
-                        map[genNodeIds[j]].x += shift;
-                    }
-                }
-            }
         }
 
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        genNodeIds.forEach(nid => {
-            const n = map[nid];
-            minX = Math.min(minX, n.x);
-            maxX = Math.max(maxX, n.x + (n.w || NW));
-            minY = Math.min(minY, n.y);
-            maxY = Math.max(maxY, n.y + (n.h || NH));
-        });
-
-        currentY = maxY + GEN_VERTICAL_GAP;
+        currentY += nodeH + GEN_V_GAP;
     });
-
-    const gen1Nodes = genMap[1] || [];
-    let centerX = 0;
-    if (gen1Nodes.length === 2) {
-        const r1 = map[gen1Nodes[0]];
-        const r2 = map[gen1Nodes[1]];
-        centerX = (r1.x + (r1.w || NW) / 2 + r2.x + (r2.w || NW) / 2) / 2;
-    } else {
-        let minX = Infinity, maxX = -Infinity;
-        Object.values(map).forEach(n => {
-            minX = Math.min(minX, n.x);
-            maxX = Math.max(maxX, n.x + (n.w || NW));
-        });
-        centerX = (minX + maxX) / 2;
-    }
-    const shift = -centerX;
-    Object.values(map).forEach(n => { n.x += shift; });
 
     return { ...map, genRegions: {} } as Record<number, Node> & { genRegions: Record<number, any> };
 }
@@ -366,8 +447,6 @@ function buildEdges(nodes: RawNode[], lmap: Record<number, Node>) {
         const baseBendY = jointY + 10;
         return { parentKey, children, jointX, jointY, baseBendY };
     }).filter(Boolean) as Array<{ parentKey: string; children: any[]; jointX: number; jointY: number; baseBendY: number }>;
-
-    parentEntries.sort((a, b) => (a.baseBendY - b.baseBendY) || (a.jointX - b.jointX));
 
     const GROUP_SPACING = 10;
     let prevBendY: number | null = null;
@@ -459,7 +538,7 @@ function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x:
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  DRAW EDGE
+//  DRAW EDGE  (không đổi — vẫn dùng edgeMods)
 // ─────────────────────────────────────────────────────────────────
 function drawEdgeFn(ctx: CanvasRenderingContext2D, e: any, T: any, lineStyle: 'curved' | 'square' = 'square', edgeMods?: Record<string, any>) {
     ctx.save();
@@ -516,10 +595,12 @@ function drawEdgeFn(ctx: CanvasRenderingContext2D, e: any, T: any, lineStyle: 'c
 // ─────────────────────────────────────────────────────────────────
 //  DRAW NODE
 // ─────────────────────────────────────────────────────────────────
-function drawNodeFn(ctx: CanvasRenderingContext2D, node: any, hov: boolean, hasBorder: boolean, sel: boolean, hl: boolean, dim: boolean, T: any, imageCache?: Record<number, HTMLImageElement | null>) {
+function drawNodeFn(ctx: CanvasRenderingContext2D, node: any, hov: boolean, hasBorder: boolean, sel: boolean, hl: boolean, dim: boolean, T: any, imageCache?: Record<number, HTMLImageElement | null>, lmap?: Record<number, any>) {
     const { x, y } = node;
     const dead = !!node.ngayMat;
     const male = node.gioiTinh === 1;
+    // nữ có ít nhất 1 spouse là nam → dâu
+    const isDau = !male && (node.pids || []).some((pid: number) => lmap?.[pid]?.gioiTinh === 1);
     const { NW: w, NH: h, FS, avata: showAvt, DD: showDeath } = getNodeSizeGen(node.gen || 1) || { NW, NH, FS: 5, avata: true, DD: false };
 
     ctx.save();
@@ -536,18 +617,19 @@ function drawNodeFn(ctx: CanvasRenderingContext2D, node: any, hov: boolean, hasB
     ctx.fillRect(x, y, w, h);
 
     if (node.gen === 1 || node.gen === 2 || node.gen === 3) {
-        drawImageCover(ctx, gen1Bg, x, y, w, h);
+        if (gen1Bg.complete && gen1Bg.naturalWidth !== 0) {
+            drawImageCover(ctx, gen1Bg, x, y, w, h);
+        }
     } else {
-        ctx.drawImage(dead ? deadBg : male ? maleBg : femaleBg, x, y, w, h);
+        const nodeBg = dead ? deadBg : isDau ? wifeBg : male ? maleBg : femaleBg;
+        if (nodeBg.complete && nodeBg.naturalWidth !== 0) {
+            ctx.drawImage(nodeBg, x, y, w, h);
+        }
     }
 
-    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
 
-    if (hasBorder) {
-        ctx.strokeStyle = sel ? T.selBdr : hov ? T.hovBdr : dead ? T.deadBdr : male ? T.maleBdr : T.femBdr;
-        ctx.lineWidth = sel ? 1 : 0.5;
-        ctx.strokeRect(x, y, w, h);
-    }
 
     if (showAvt) {
         const avatarSize = 26;
@@ -558,11 +640,13 @@ function drawNodeFn(ctx: CanvasRenderingContext2D, node: any, hov: boolean, hasB
         ctx.strokeStyle = sel ? T.selBdr : dead ? T.deadBdr : male ? T.maleBdr : T.femBdr;
         ctx.lineWidth = 0.5;
         ctx.strokeRect(avatarX, avatarY, avatarSize, avatarSize);
-        if (imageCache && imageCache[node.id]) {
+        const avatarImage = imageCache?.[node.id] ?? defaultAvatar;
+        if (avatarImage.complete && avatarImage.naturalWidth !== 0) {
             ctx.globalAlpha = 1;
-            ctx.drawImage(imageCache[node.id] || defaultAvatar, avatarX, avatarY, avatarSize, avatarSize);
+            ctx.drawImage(avatarImage, avatarX, avatarY, avatarSize, avatarSize);
         } else {
-            ctx.drawImage(defaultAvatar, avatarX, avatarY, avatarSize, avatarSize);
+            ctx.fillStyle = '#c8c8c8';
+            ctx.fillRect(avatarX + 2, avatarY + 2, avatarSize - 4, avatarSize - 4);
         }
     }
 
@@ -626,6 +710,64 @@ const TH: Record<string, any> = {
 };
 
 // ─────────────────────────────────────────────────────────────────
+//  COMPUTE TREE BOUNDS — dùng chung cho mọi nơi cần biết bounds
+// ─────────────────────────────────────────────────────────────────
+function computeTreeBounds(lmap: Record<number, Node>) {
+    const nodes = Object.values(lmap);
+    if (!nodes.length) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    nodes.forEach((n: Node) => {
+        const nw = (getNodeSizeGen(n.gen || 1) || { NW }).NW;
+        const nh = (getNodeSizeGen(n.gen || 1) || { NH }).NH;
+        x0 = Math.min(x0, n.x);
+        y0 = Math.min(y0, n.y);
+        x1 = Math.max(x1, n.x + nw);
+        y1 = Math.max(y1, n.y + nh);
+    });
+    return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0 };
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  COMPUTE PRIMARY-BG PLACEMENT (world-space) — HÀM DUY NHẤT
+//
+//  Trả về vị trí và kích thước của primaryBg trong toạ độ world
+//  (cùng hệ toạ độ với các node), để cả draw() lẫn buildOffscreen()
+//  đều dùng chung, đảm bảo khung nền luôn nằm đúng vị trí so với cây.
+//
+//  Tham số:
+//    bounds  — kết quả từ computeTreeBounds()
+//    aspect  — tỉ lệ w/h của ảnh primaryBg (mặc định 10:7 ~ 4900:3500)
+//    padTop  — khoảng cách (world units) từ top của bounds đến top của khung
+//    padH    — tổng padding dọc thêm vào ngoài chiều cao cây
+// ─────────────────────────────────────────────────────────────────
+function computePrimaryBgRect(
+    bounds: { x0: number; y0: number; x1: number; y1: number; w: number; h: number },
+    aspect = 4900 / 3500,
+    padTop = 300,
+    padH = 700,
+) {
+    const PAD_LR = 120;
+    const PAD_BOTTOM = 50;
+
+    // Chiều rộng bám theo chiều rộng cây + padding trái/phải
+    const frameW = bounds.w + PAD_LR * 2;
+
+    // Chiều cao: đảm bảo toàn bộ node vừa trong 3/4 phía dưới của bg.
+    // Vì node bắt đầu tại 1/4 frameH → cần 3/4 * frameH >= bounds.h + PAD_BOTTOM
+    // → frameH >= (bounds.h + PAD_BOTTOM) * 4/3
+    // Đồng thời giữ đúng tỉ lệ ảnh nếu aspect cho height lớn hơn.
+    const frameH = Math.max(frameW / aspect, (bounds.h + PAD_BOTTOM) * (4 / 3));
+
+    // Căn trái = cạnh trái cây - padding
+    const frameX = bounds.x0 - PAD_LR;
+
+    // Đặt top bg sao cho: frameY + frameH/4 = bounds.y0 (node bắt đầu từ 1/4 bg)
+    const frameY = bounds.y0 - frameH / 4;
+
+    return { x: frameX, y: frameY, w: frameW, h: frameH };
+}
+
+// ─────────────────────────────────────────────────────────────────
 //  COMPONENT PROPS
 // ─────────────────────────────────────────────────────────────────
 interface FamilyTreeCanvasProps {
@@ -642,6 +784,7 @@ export default function FamilyTreeCanvasGiaPha({ data: propData, dongHoId, onSel
     const raf = useRef<number | null>(null);
     const container = useRef<HTMLDivElement>(null);
     const imageCache = useRef<Record<number, HTMLImageElement | null>>({});
+    const ctrlClickWasSelected = useRef(false); // track trạng thái selection trước khi onDown chạy
 
     const R = useRef<RState>({
         scale: 1, ox: 0, oy: 0,
@@ -719,9 +862,18 @@ export default function FamilyTreeCanvasGiaPha({ data: propData, dongHoId, onSel
     }, [rawData, maxGen]);
 
     // ─────────────────────────────────────────────────────────────────
-    //  renderTreeContent — HÀM RENDER DUY NHẤT
-    //  Gọi khi ctx đã ở đúng world-space (đã translate + scale)
-    //  Dùng chung cho: draw(), previewAsImage(), downloadAsImage()
+    //  renderTreeContent — HÀM RENDER DUY NHẤT (world-space)
+    //
+    //  Thứ tự vẽ:
+    //    1. primaryBg (nếu được bật)  — nền sau cùng
+    //    2. Tất cả edges              — đường nối trước node
+    //    3. Bend-point dots           — điểm điều chỉnh
+    //    4. Tất cả nodes              — node ĐÈ LÊN đường nối
+    //    5. Selection rect            — khung chọn vùng (chỉ cho working canvas)
+    //
+    //  primaryBgRect: toạ độ world của khung primaryBg, tính bởi
+    //    computePrimaryBgRect() → đảm bảo ĐỒNG BỘ giữa working canvas
+    //    và offscreen (preview/download).
     // ─────────────────────────────────────────────────────────────────
     const renderTreeContent = useCallback((
         ctx: CanvasRenderingContext2D,
@@ -736,9 +888,10 @@ export default function FamilyTreeCanvasGiaPha({ data: propData, dongHoId, onSel
             selId?: number | null;
             hovId?: number | null;
             hl?: Set<number>;
-            showPreviewFrame?: boolean;
-            previewSize?: { width: number; height: number };
-        } = {}
+            /** Nếu truyền vào, vẽ primaryBg tại rect này (world-space) */
+            primaryBgRect?: { x: number; y: number; w: number; h: number } | null;
+        } = {},
+        imageCache_?: Record<number, HTMLImageElement | null>,
     ) => {
         const {
             scale = 1,
@@ -747,44 +900,28 @@ export default function FamilyTreeCanvasGiaPha({ data: propData, dongHoId, onSel
             selId = null,
             hovId = null,
             hl = new Set<number>(),
-            showPreviewFrame = false,
-            previewSize: pSize = { width: 4900, height: 3500 },
+            primaryBgRect = null,
         } = opts;
 
-        // ── Preview frame (khung ảnh xuất, chỉ hiện trên canvas làm việc) ──
-        if (showPreviewFrame) {
-            const nodes = Object.values(lmap);
-            if (nodes.length) {
-                let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-                nodes.forEach((n: Node) => {
-                    x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y);
-                    x1 = Math.max(x1, n.x + CANVAS_NW); y1 = Math.max(y1, n.y + CANVAS_NH);
-                });
-                const gen1Nodes = nodes.filter((n: Node) => n.doiThuoc === 1);
-                const treeCenterX = gen1Nodes.length >= 2
-                    ? (gen1Nodes[0].x + gen1Nodes[1].x + CANVAS_NW) / 2
-                    : (x0 + x1) / 2;
-                const scaleFactor = 2.5;
-                const frameW = pSize.width / scaleFactor;
-                const frameH = pSize.height / scaleFactor;
-                const translateX = frameW / 2 - treeCenterX - 50;
-                const translateY = 100;
-                const frameX = -translateX;
-                const frameY = -translateY;
-                ctx.save();
-                if (primaryBg.complete && primaryBg.naturalWidth !== 0) {
-                    ctx.drawImage(primaryBg, frameX, frameY, frameW, frameH);
-                } else {
-                    ctx.strokeStyle = '#ff0000';
-                    ctx.setLineDash([4 / scale, 2 / scale]);
-                    ctx.lineWidth = 2 / scale;
-                    ctx.strokeRect(frameX, frameY, frameW, frameH);
-                }
-                ctx.restore();
+        // ── 1. primaryBg (world-space) ──
+        if (primaryBgRect) {
+            ctx.save();
+            if (primaryBg.complete && primaryBg.naturalWidth !== 0) {
+                ctx.drawImage(primaryBg, primaryBgRect.x, primaryBgRect.y, primaryBgRect.w, primaryBgRect.h);
+            } else {
+                ctx.strokeStyle = 'rgba(255,0,0,0.4)';
+                ctx.setLineDash([4, 2]);
+                ctx.lineWidth = 1;
+                ctx.strokeRect(primaryBgRect.x, primaryBgRect.y, primaryBgRect.w, primaryBgRect.h);
+                ctx.setLineDash([]);
             }
+            ctx.restore();
         }
 
-        // ── Bend points ──
+        // ── 2. Edges — vẽ TRƯỚC nodes ──
+        edges.forEach((e: any) => drawEdgeFn(ctx, e, T, lineStyle, edgeMods));
+
+        // ── 3. Bend-point dots ──
         edges.forEach((e: any) => {
             if (e.type === 'parent' && e.bendX !== undefined && e.bendY !== undefined) {
                 const mod = edgeMods[e.id];
@@ -799,7 +936,25 @@ export default function FamilyTreeCanvasGiaPha({ data: propData, dongHoId, onSel
             }
         });
 
-        // ── Selection rect ──
+        // ── 4. Nodes — ĐÈ LÊN edges ──
+        const hasHl = hl.size > 0;
+        const hasGroup = selSet.size > 0;
+        Object.values(lmap).forEach((n: Node) => {
+            const isSelected = selSet.has(n.id);
+            drawNodeFn(
+                ctx, n,
+                n.id === hovId,
+                true,
+                isSelected || n.id === selId,
+                hasGroup ? isSelected : (hasHl && hl.has(n.id)),
+                hasGroup ? !isSelected : (hasHl && !hl.has(n.id)),
+                T,
+                imageCache_ ?? imageCache.current,
+                lmap,
+            );
+        });
+
+        // ── 5. Selection rect (chỉ trên working canvas) ──
         if (selRect) {
             ctx.save();
             ctx.strokeStyle = '#4070e8';
@@ -813,26 +968,6 @@ export default function FamilyTreeCanvasGiaPha({ data: propData, dongHoId, onSel
             );
             ctx.restore();
         }
-
-        // ── Nodes ──
-        const hasHl = hl.size > 0;
-        const hasGroup = selSet.size > 0;
-        Object.values(lmap).forEach((n: Node) => {
-            const isSelected = selSet.has(n.id);
-            drawNodeFn(
-                ctx, n,
-                n.id === hovId,
-                true,
-                isSelected || n.id === selId,
-                hasGroup ? isSelected : (hasHl && hl.has(n.id)),
-                hasGroup ? !isSelected : (hasHl && !hl.has(n.id)),
-                T,
-                imageCache.current,
-            );
-        });
-
-        // ── Edges ──
-        edges.forEach((e: any) => drawEdgeFn(ctx, e, T, lineStyle, edgeMods));
     }, [lineStyle]);
 
     // ─────────────────────────────────────────────────────────────────
@@ -847,7 +982,7 @@ export default function FamilyTreeCanvasGiaPha({ data: propData, dongHoId, onSel
         const W = c.width, H = c.height;
         const dpr = window.devicePixelRatio || 1;
 
-        // Phase 1: background + grid (screen space, trước khi transform)
+        // Phase 1: background + grid (screen space)
         ctx.save();
         ctx.drawImage(background, 0, 0, W, H);
         ctx.fillStyle = T.bg; ctx.globalAlpha = 0.8;
@@ -866,113 +1001,117 @@ export default function FamilyTreeCanvasGiaPha({ data: propData, dongHoId, onSel
         ctx.scale(dpr, dpr);
         ctx.translate(ox, oy);
         ctx.scale(scale, scale);
+
+        // Tính primaryBgRect theo cùng công thức với offscreen
+        const bounds = computeTreeBounds(lmap);
+        const bgRect = bounds
+            ? computePrimaryBgRect(bounds, previewSize.width / previewSize.height)
+            : null;
+
         renderTreeContent(ctx, lmap, edges, edgeMods, T, {
             scale,
             selRect, selSet, selId, hovId, hl,
-            showPreviewFrame: true,
-            previewSize,
+            primaryBgRect: bgRect,
         });
         ctx.restore();
     }, [renderTreeContent, previewSize]);
 
     // ─────────────────────────────────────────────────────────────────
-    //  buildOffscreenCanvas() — dùng chung cho preview + download
+    //  buildOffscreenCanvas() — preview + download
+    //  Dùng cùng computePrimaryBgRect() nên luôn đồng bộ với draw()
     // ─────────────────────────────────────────────────────────────────
-  const buildOffscreenCanvas = useCallback((): HTMLCanvasElement | null => {
-    const nodes = Object.values(R.current.lmap);
-    if (!nodes.length) return null;
+    const buildOffscreenCanvas = useCallback((): HTMLCanvasElement | null => {
+        const nodes = Object.values(R.current.lmap);
+        if (!nodes.length) return null;
 
-    const T = dark ? TH.dark : TH.light;
-    const canvasWidth  = previewSize.width  * SCALE_LAN;
-    const canvasHeight = previewSize.height * SCALE_LAN;
+        const T = dark ? TH.dark : TH.light;
 
-    // ── Tính bounds thực tế của cây ──
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    nodes.forEach((n: Node) => {
-        const nw = (getNodeSizeGen(n.gen || 1) || { NW }).NW;
-        const nh = (getNodeSizeGen(n.gen || 1) || { NH }).NH;
-        x0 = Math.min(x0, n.x);
-        y0 = Math.min(y0, n.y);
-        x1 = Math.max(x1, n.x + nw);
-        y1 = Math.max(y1, n.y + nh);
-    });
+        // Tỉ lệ ảnh xuất
+        const aspect = previewSize.width / previewSize.height;
 
-    const treeW = x1 - x0;
-    const treeH = y1 - y0;
+        const bounds = computeTreeBounds(R.current.lmap);
+        if (!bounds) return null;
 
-    // ── Thông số layout ảnh xuất ──
-    const scaledHpbgW = 1500 * SCALE_LAN;
-    const hpbgX = (canvasWidth - scaledHpbgW) / 2;
-    const hpbgY = 200 * SCALE_LAN;
-    const scaleFactor = 4;
+        // Tính bgRect (world-space) — ĐỒNG BỘ với draw()
+        const bgRect = computePrimaryBgRect(bounds, aspect);
 
-    // ── CÔNG THỨC ĐÚNG ──
-    // Muốn top của cây (y0) nằm ở vị trí targetY trong offscreen canvas
-    // Sau khi scale(scaleFactor): vị trí pixel thực = coord * scaleFactor + translate
-    // Vậy: targetY = y0 * scaleFactor + translateY
-    //   => translateY = targetY - y0 * scaleFactor
+        // Scale để render ảnh xuất có độ phân giải cao
+        const scaleFactor = SCALE_LAN * 4;
 
-    const paddingTop = 60 * SCALE_LAN;   // khoảng cách từ top decoration đến cây
-    const targetY = hpbgY + paddingTop;   // pixel trong offscreen canvas nơi cây bắt đầu
+        // Kích thước canvas = bgRect.w × bgRect.h × scaleFactor
+        // (toàn bộ nội dung nằm trong vùng bgRect)
+        const canvasW = Math.round(bgRect.w * scaleFactor);
+        const canvasH = Math.round(bgRect.h * scaleFactor);
 
-    // Căn cây nằm giữa theo chiều ngang trong vùng background
-    const hpbgCenterX = hpbgX + scaledHpbgW / 2;
-    const treeCenterX = (x0 + x1) / 2;
-    const targetX = hpbgCenterX;         // pixel trong offscreen canvas: tâm cây
+        const offscreen = document.createElement('canvas');
+        offscreen.width  = canvasW;
+        offscreen.height = canvasH;
+        const offCtx = offscreen.getContext('2d')!;
 
-    const translateX = (targetX / scaleFactor) - treeCenterX - 30;
-const translateY = (targetY / scaleFactor) - y0 - 40;
+        // Phase 1: background decoration (screen-space của offscreen)
+        if (primaryBg.complete && primaryBg.naturalWidth !== 0) {
+            offCtx.drawImage(primaryBg, 0, 0, canvasW, canvasH);
+        } else {
+            offCtx.fillStyle = '#fff6d0';
+            offCtx.fillRect(0, 0, canvasW, canvasH);
+            if (bg.complete && bg.naturalWidth !== 0) {
+                offCtx.drawImage(bg, 0, 0, canvasW, canvasH);
+            }
+        }
 
-    // ── Tạo offscreen canvas ──
-    const offscreen = document.createElement('canvas');
-    offscreen.width  = canvasWidth;
-    offscreen.height = canvasHeight;
-    const offCtx = offscreen.getContext('2d')!;
+        // Chips thống kê (vẽ ở góc dưới offscreen, screen-space)
+        const memberCount = nodes.length;
+        const maleCount   = nodes.filter((n: any) => n.gioiTinh === 1).length;
+        const femaleCount = memberCount - maleCount;
+        const gen1Nodes   = nodes.filter((n: any) => n.doiThuoc === 1);
+        const hienTuc     = gen1Nodes.reduce((s: number, n: any) => s + (n.pids?.length || 0), 0);
 
-    // Phase 1: background + decorations (screen space)
-    if (primaryBg.complete && primaryBg.naturalWidth !== 0) {
-        offCtx.drawImage(primaryBg, 0, 0, canvasWidth, canvasHeight);
-    } else {
-        offCtx.fillStyle = '#fff6d0';
-        offCtx.fillRect(0, 0, canvasWidth, canvasHeight);
-        offCtx.drawImage(bg, 0, 0, canvasWidth, canvasHeight);
-    }
+        const chipSize = Math.round(canvasW * 0.08);
+        const chipY    = Math.round(canvasH * 0.88);
+        const chipGap  = Math.round(chipSize * 0.06);
+        const totalChipW = 4 * chipSize + 3 * chipGap;
+        const chipStartX = (canvasW - totalChipW) / 2;
 
-    // Chips thống kê
-    const gen1Nodes = nodes.filter((n: any) => n.doiThuoc === 1);
-    const memberCount = nodes.length;
-    const maleCount   = nodes.filter((n: any) => n.gioiTinh === 1).length;
-    const femaleCount = memberCount - maleCount;
-    const hienTuc = gen1Nodes
-        .reduce((s: number, n: any) => s + (n.pids?.length || 0), 0);
-    const chipSize = 410 * SCALE_LAN;
-    const xStart = hpbgX - 60 * SCALE_LAN;
-    const yChip  = hpbgY + 2899 * SCALE_LAN;
-    [
-        `Tộc Nhân: ${memberCount}`,
-        `Nam Đinh: ${maleCount}`,
-        `Nữ Khuê: ${femaleCount}`,
-        `Hiền Tức: ${hienTuc}`,
-    ].forEach((value, i) => {
-        const XChip = xStart + i * (chipSize);
-        offCtx.fillStyle = '#333';
-        offCtx.font = `bold ${24 * SCALE_LAN}px Arial`;
-        offCtx.textAlign = 'center';
-        offCtx.textBaseline = 'middle';
-        offCtx.fillText(value, XChip + chipSize / 2, yChip + chipSize / 2);
-    });
+        ([
+            `Tộc Nhân: ${memberCount}`,
+            `Nam Đinh: ${maleCount}`,
+            `Nữ Khuê: ${femaleCount}`,
+            `Hiền Tức: ${hienTuc}`,
+        ] as string[]).forEach((label, i) => {
+            const cx = chipStartX + i * (chipSize + chipGap);
+            if (chipBg.complete && chipBg.naturalWidth !== 0) {
+                offCtx.drawImage(chipBg, cx, chipY, chipSize, chipSize);
+            } 
+            offCtx.fillStyle = '#b41a1a';
+            offCtx.font = `bold ${Math.round(chipSize * 0.07)}px Dancing Script`;
+            offCtx.textAlign = 'center';
+            offCtx.textBaseline = 'middle';
+            offCtx.fillText(label, cx + chipSize / 2, (chipY + chipSize / 2) + 40);
+        });
 
-    // Phase 2: tree (world space)
-    offCtx.save();
-offCtx.scale(scaleFactor, scaleFactor);
-offCtx.translate(translateX, translateY);  // world units, không chia lại
-renderTreeContent(offCtx, R.current.lmap, R.current.edges, R.current.edgeMods, T);
-offCtx.restore();
+        // Phase 2: tree (world-space → screen-space của offscreen)
+        //
+        // Muốn bgRect.x,bgRect.y (world) ánh xạ vào (0,0) (offscreen screen)
+        // Sau transform: screenX = (worldX - bgRect.x) * scaleFactor
+        //             = worldX * scaleFactor - bgRect.x * scaleFactor
+        // Tức là: translate(-bgRect.x, -bgRect.y) rồi scale(scaleFactor)
+        // hoặc: scale(scaleFactor) rồi translate(-bgRect.x, -bgRect.y)
+        offCtx.save();
+        offCtx.scale(scaleFactor, scaleFactor);
+        offCtx.translate(-bgRect.x, -bgRect.y);
 
-    return offscreen;
-}, [dark, previewSize, renderTreeContent]);
+        // Không vẽ primaryBgRect ở đây vì Phase 1 đã vẽ toàn canvas
+        renderTreeContent(offCtx, R.current.lmap, R.current.edges, R.current.edgeMods, T, {
+            primaryBgRect: null,   // đã vẽ rồi
+        }, imageCache.current);
+
+        offCtx.restore();
+
+        return offscreen;
+    }, [dark, previewSize, renderTreeContent]);
+
     // ─────────────────────────────────────────────────────────────────
-    //  previewAsImage() — dùng buildOffscreenCanvas
+    //  previewAsImage()
     // ─────────────────────────────────────────────────────────────────
     const previewAsImage = useCallback(() => {
         const offscreen = buildOffscreenCanvas();
@@ -983,7 +1122,7 @@ offCtx.restore();
     }, [buildOffscreenCanvas]);
 
     // ─────────────────────────────────────────────────────────────────
-    //  downloadAsImage() — tái dùng preview đã có, hoặc build mới
+    //  downloadAsImage()
     // ─────────────────────────────────────────────────────────────────
     const downloadAsImage = useCallback(() => {
         const doDownload = (href: string) => {
@@ -995,7 +1134,6 @@ offCtx.restore();
             link.remove();
         };
 
-        // Nếu preview đang mở, dùng lại ảnh đó
         if (previewImageSrc) {
             doDownload(previewImageSrc);
             setShowPreviewModal(false);
@@ -1003,7 +1141,6 @@ offCtx.restore();
             return;
         }
 
-        // Ngược lại, build offscreen canvas mới
         const offscreen = buildOffscreenCanvas();
         if (!offscreen) return;
         offscreen.toBlob(blob => {
@@ -1036,13 +1173,13 @@ offCtx.restore();
         ctx.save();
         ctx.translate(tx, ty);
         ctx.scale(scale, scale);
+        edges.forEach((e: any) => drawEdgeFn(ctx, e, T, lineStyle, edgeMods));
         nodes.forEach((n: Node) => {
             const male = n.gioiTinh === 1;
             const dead = !!n.ngayMat;
             ctx.fillStyle = dead ? '#888' : male ? '#4070e8' : '#cc3898';
             ctx.fillRect(n.x, n.y, CANVAS_NW, CANVAS_NH);
         });
-        edges.forEach((e: any) => drawEdgeFn(ctx, e, T, lineStyle, edgeMods));
         ctx.restore();
     }, [dark, lineStyle]);
 
@@ -1238,8 +1375,12 @@ offCtx.restore();
 
         if (h !== null) {
             if (e.ctrlKey) {
-                if (r.selSet.has(h)) r.selSet.delete(h); else r.selSet.add(h);
+                // Ghi lại trạng thái trước khi add để onClick biết cần toggle-off hay không
+                ctrlClickWasSelected.current = r.selSet.has(h);
+                r.selSet.add(h);
             } else {
+                // Không Ctrl: nếu click vào node chưa trong selection → clear rồi chọn mình nó
+                // Nếu node đã trong selection → giữ nguyên để chuẩn bị group drag
                 if (!r.selSet.has(h)) { r.selSet.clear(); r.selSet.add(h); }
             }
             r.selId = h;
@@ -1273,6 +1414,8 @@ offCtx.restore();
             }
             r.selId = null;
             r.groupDrag = null;
+            // Ctrl+drag trên vùng trống = pan (giữ selection hiện tại)
+            // Drag thường = rubber-band (xóa selection cũ)
             if (e.ctrlKey) {
                 r.panning = true;
                 r.panStart = { sx, sy, ox: r.ox, oy: r.oy };
@@ -1300,14 +1443,17 @@ offCtx.restore();
 
         if (r.groupDrag) {
             const { ids, offsets } = r.groupDrag;
+            const idSet = new Set(ids);
             ids.forEach((id: number) => {
                 const node = r.lmap[id];
                 const off = offsets[id];
                 node.x = Math.round((wx - off.dx) / 3) * 3;
                 node.y = Math.round((wy - off.dy) / 3) * 3;
                 (node.pids || []).forEach((sid: number) => {
-                    const s = r.lmap[sid];
-                    if (s) s.y = node.y;
+                    if (!idSet.has(sid)) {
+                        const s = r.lmap[sid];
+                        if (s) s.y = node.y;
+                    }
                 });
             });
             r.edges = buildEdges(norm, r.lmap);
@@ -1350,9 +1496,9 @@ offCtx.restore();
             const ry1 = Math.max(r.selRect.y0, r.selRect.y1);
             r.selSet.clear();
             Object.values(r.lmap).forEach((n: any) => {
-                const cx = n.x + CANVAS_NW / 2;
-                const cy = n.y + CANVAS_NH / 2;
-                if (cx >= rx0 && cx <= rx1 && cy >= ry0 && cy <= ry1) r.selSet.add(n.id);
+                const nw = n.w || NW;
+                const nh = n.h || NH;
+                if (n.x + nw >= rx0 && n.x <= rx1 && n.y + nh >= ry0 && n.y <= ry1) r.selSet.add(n.id);
             });
             sched(); return;
         }
@@ -1372,7 +1518,8 @@ offCtx.restore();
         if (r.edgeDrag) debouncedSaveEdgeCoordinates();
         r.edgeDrag = null;
         if (r.selRect) r.selRect = null;
-    }, [debouncedSaveEdgeCoordinates]);
+        sched(); // redraw để ẩn selection rect và hiện viền cam của các node đã chọn
+    }, [debouncedSaveEdgeCoordinates, sched]);
 
     const onDbl = useCallback((e: React.MouseEvent) => {
         const { sx, sy } = cssPx(e);
@@ -1390,7 +1537,14 @@ offCtx.restore();
         const { x, y } = toWorld(sx, sy);
         const h = hit(R.current.lmap, x, y);
         if (h !== null) {
-            if (!R.current.selSet.has(h)) { R.current.selSet.clear(); R.current.selSet.add(h); }
+            if (e.ctrlKey) {
+                // Ctrl+click thuần (không drag): chỉ toggle-off nếu node ĐÃ được chọn trước đó
+                // (onDown đã ghi vào ctrlClickWasSelected.current)
+                if (ctrlClickWasSelected.current) R.current.selSet.delete(h);
+                // else: node mới được add bởi onDown → giữ nguyên
+            } else {
+                if (!R.current.selSet.has(h)) { R.current.selSet.clear(); R.current.selSet.add(h); }
+            }
             R.current.selId = h;
         } else if (!e.ctrlKey) {
             R.current.selSet.clear();

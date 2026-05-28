@@ -14,6 +14,7 @@ import relationshipRouter from "./relationshipRouter";
 import aiQueryRouter from "./aiQueryRouter";
 import text2sqlRouter from "./text2sqlRoutes";
 import bankTransferRouter from "./bankTransferRouter";
+import phaKyRouter from "./phaKyRouter";
 
 const router = Router();
 router.use('/users', nguoiDungRouter);
@@ -31,5 +32,6 @@ router.use("/relationships", relationshipRouter);
 router.use("/ai", aiQueryRouter);
 router.use("/text2sql", text2sqlRouter);
 router.use("/bank-transfer", bankTransferRouter);
+router.use("/phaky", phaKyRouter);
 
 export default router;
