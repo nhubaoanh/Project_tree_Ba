@@ -34,9 +34,11 @@ interface Props {
   dongHoId?: string;
   queryClient?: QueryClient;
   onDataChange?: () => void;
+  treeViewMode?: "standard" | "giaPha";
+  onTreeViewModeChange?: (mode: "standard" | "giaPha") => void;
 }
 
-const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props) => {
+const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange, treeViewMode, onTreeViewModeChange }: Props) => {
   // ===== React Flow Hooks =====
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -418,6 +420,8 @@ const MyFamilyTreeInner = ({ data, dongHoId, queryClient, onDataChange }: Props)
           onAddMember={handleAddMember}
           onRefresh={onDataChange}
           onPrint={handlePrintA0}
+          treeViewMode={treeViewMode}
+          onTreeViewModeChange={onTreeViewModeChange}
         />
       </ReactFlow>
       

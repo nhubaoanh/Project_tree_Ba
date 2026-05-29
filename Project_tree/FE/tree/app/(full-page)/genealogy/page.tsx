@@ -14,6 +14,7 @@ import { buildTree } from "@/utils/treeUtils";
 import SuKienPage from "../events/page";
 import storage from "@/utils/storage";
 import { AIChatBox } from "@/components/shared/AIChatBox";
+import FamilyTreeCanvasGiaPha from "@/components/ui/tree/treeCanvasGiaPha";
 
 // Loading component
 function GenealogyLoading() {
@@ -390,6 +391,7 @@ function GenealogyContent() {
   const queryClient = useQueryClient();
   const [activeView, setActiveView] = useState<ViewMode>(ViewMode.PHA_KY);
   const [showAIChat, setShowAIChat] = useState(false);
+  const [treeViewMode, setTreeViewMode] = useState<"standard" | "giaPha">("standard");
   
   // Lấy dongHoId từ URL
   const urlDongHoId = searchParams.get("dongHoId");
@@ -487,11 +489,22 @@ function GenealogyContent() {
                   <div className="text-[#8b5e3c]">Đang tải cây gia phả...</div>
                 </div>
               ) : treeData.length > 0 ? (
-                <MyFamilyTree 
-                  data={treeData} 
-                  dongHoId={selectedDongHoId}
-                  queryClient={queryClient}
-                />
+                treeViewMode === "standard" ? (
+                  <MyFamilyTree 
+                    data={treeData} 
+                    dongHoId={selectedDongHoId}
+                    queryClient={queryClient}
+                    treeViewMode={treeViewMode}
+                    onTreeViewModeChange={setTreeViewMode}
+                  />
+                ) : (
+                  <FamilyTreeCanvasGiaPha
+                    data={data}
+                    dongHoId={selectedDongHoId}
+                    treeViewMode={treeViewMode}
+                    onTreeViewModeChange={setTreeViewMode}
+                  />
+                )
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-[#8b5e3c]">
                   <Users size={64} className="mb-4 opacity-50" />

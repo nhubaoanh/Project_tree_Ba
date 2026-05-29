@@ -112,11 +112,13 @@ const FamilyTreeCanvas: React.FC<{
       img.onerror = () => res(null);
     });
     Promise.all([
-      load("/images/nengiaphavang.jpg"),
-      load("/images/rong.png"),
-      load("/images/rong2.png"),
-      load("/images/logo1.png"),
-    ]).then(([bg, r1, r2, lg]) => setAssets({ bg, r1, r2, lg }));
+      load("/images/primary_bg.png"),
+      load("/images/node_background_1.png"),
+      load("/images/node_background_female.png"),
+      load("/images/node_background_dead.jpg"),
+    ]).then(([bg, nodeBg1, nodeBgFemale, nodeBgDead]) => 
+      setAssets({ bg, nodeBg1, nodeBgFemale, nodeBgDead })
+    );
   }, []);
 
   // ── layout ─────────────────────────────────────────────────────────────────
@@ -438,17 +440,6 @@ const FamilyTreeCanvas: React.FC<{
       const lgW = Math.round((assets.lg.naturalWidth / assets.lg.naturalHeight) * lgH);
       ctx.drawImage(assets.lg, mid - lgW / 2, 30, lgW, lgH);
     }
-
-    // Chữ nằm BÊN DƯỚI logo (logo cao ~930px từ y=30)
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#b91c1c";
-    ctx.font = "bold 200px 'Times New Roman', serif";
-    ctx.fillText("GIA PHẢ", mid, 1090);
-    ctx.fillStyle = "#7c2d12";
-    ctx.font = "bold 75px 'Times New Roman', serif";
-    ctx.fillText(`Dòng họ ${title}`, mid, 1200);
-
-
     // Vẽ đường nối TRƯỚC để nằm dưới hộp
     drawRelations(ctx);
 
@@ -458,38 +449,69 @@ const FamilyTreeCanvas: React.FC<{
     // Vẽ hộp
     nodes.forEach(n => {
       const isTop = !n.isV;
+      const isDead = !!n.data.ngayMat;
+      
       ctx.shadowColor = "rgba(0,0,0,0.15)";
       ctx.shadowBlur = 6;
-      ctx.fillStyle = "#EEEE0A";
-      ctx.fillRect(n.x, n.y, n.w, n.h);
+      
+      // Chọn hình nền dựa trên trạng thái và giới tính
+      let bgImage = null;
+      if (isDead) {
+        bgImage = assets.nodeBgDead; // Người đã mất
+      } else if (n.data.gioiTinh === 1) {
+        bgImage = assets.nodeBgDead; // Nam còn sống
+      } else if (n.data.gioiTinh === 0) {
+        bgImage = assets.nodeBgFemale; // Nữ còn sống
+      } else {
+        bgImage = assets.nodeBg1; // Mặc định
+      }
+      
+      // Vẽ hình nền nếu có, không thì dùng màu vàng
+      if (bgImage) {
+        ctx.drawImage(bgImage, n.x, n.y, n.w, n.h);
+      } else {
+        ctx.fillStyle = "#a6a696ff";
+        ctx.fillRect(n.x, n.y, n.w, n.h);
+      }
+      
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = n.data.ngayMat ? "#991b1b" : "#dc2626";
+      ctx.strokeStyle = isDead ? "#991b1b" : "#dc2626";
       ctx.lineWidth = 1.5;
       ctx.strokeRect(n.x, n.y, n.w, n.h);
 
       const name = n.data.hoTen || "";
       const yearStr = buildYearStr(n.data);
       ctx.fillStyle = "#B91C1C";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
 
       if (isTop) {
+        // Node ngang (thế hệ 1-4)
         ctx.font = "bold 26px sans-serif";
-        ctx.fillText(name, n.x + n.w / 2, n.y + 50);
+        ctx.fillText(name, n.x + n.w / 2, n.y + n.h / 2 - 15);
         ctx.font = "bold 18px sans-serif";
         ctx.fillStyle = "#660000";
-        ctx.fillText(yearStr, n.x + n.w / 2, n.y + 90);
+        ctx.fillText(yearStr, n.x + n.w / 2, n.y + n.h / 2 + 15);
       } else {
+        // Node dọc (thế hệ 5+)
         const fs = Math.max(12, 18 - (n.gen - 5));
         ctx.font = `bold ${fs}px sans-serif`;
-        let ty = n.y + 30;
-        name.split(" ").forEach((w: string) => {
+        const words = name.split(" ");
+        const totalTextHeight = words.length * (fs + 4);
+        const yearHeight = yearStr ? (Math.max(10, fs - 2) + 8) : 0;
+        const contentHeight = totalTextHeight + yearHeight;
+        let ty = n.y + (n.h - contentHeight) / 2 + fs / 2;
+        
+        words.forEach((w: string) => {
           ctx.fillStyle = "#B91C1C";
           ctx.fillText(w, n.x + n.w / 2, ty);
           ty += fs + 4;
         });
+        
         if (yearStr) {
           ctx.font = `bold ${Math.max(10, fs - 2)}px sans-serif`;
           ctx.fillStyle = "#660000";
-          ctx.fillText(yearStr, n.x + n.w / 2, n.y + n.h - 15);
+          ctx.fillText(yearStr, n.x + n.w / 2, ty + 4);
         }
       }
     });

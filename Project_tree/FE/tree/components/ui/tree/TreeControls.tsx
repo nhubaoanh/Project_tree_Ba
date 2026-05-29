@@ -17,7 +17,9 @@ import {
   ChevronRight,
   Settings,
   Printer,
-  X
+  X,
+  Network,
+  GitBranch
 } from "lucide-react";
 
 interface TreeControlsProps {
@@ -32,6 +34,8 @@ interface TreeControlsProps {
   onAddMember: () => void;
   onRefresh?: () => void;
   onPrint?: () => void;
+  treeViewMode?: "standard" | "giaPha";
+  onTreeViewModeChange?: (mode: "standard" | "giaPha") => void;
 }
 
 export const TreeControls = memo(({
@@ -46,6 +50,8 @@ export const TreeControls = memo(({
   onAddMember,
   onRefresh,
   onPrint,
+  treeViewMode,
+  onTreeViewModeChange,
 }: TreeControlsProps) => {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const [showLeftPanel, setShowLeftPanel] = useState(true);
@@ -123,6 +129,43 @@ export const TreeControls = memo(({
                 </Button>
               </div>
             </div>
+
+            {/* Tree View Mode Toggle */}
+            {onTreeViewModeChange && treeViewMode && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Chế độ xem:</label>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => onTreeViewModeChange("standard")}
+                    variant={treeViewMode === "standard" ? "default" : "outline"}
+                    size="sm"
+                    className={`flex-1 h-11 ${
+                      treeViewMode === "standard"
+                        ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white"
+                        : "dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                    } active:scale-95 transition-all`}
+                    title="Cây sơ đồ thông thường"
+                  >
+                    <Network className="h-4 w-4 mr-1" />
+                    Xem chi tiết
+                  </Button>
+                  <Button
+                    onClick={() => onTreeViewModeChange("giaPha")}
+                    variant={treeViewMode === "giaPha" ? "default" : "outline"}
+                    size="sm"
+                    className={`flex-1 h-11 ${
+                      treeViewMode === "giaPha"
+                        ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white"
+                        : "dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                    } active:scale-95 transition-all`}
+                    title="Cây gia phả truyền thống"
+                  >
+                    <GitBranch className="h-4 w-4 mr-1" />
+                    Trực quan
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Generation Filter */}
             <div className="space-y-1">

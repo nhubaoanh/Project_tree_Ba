@@ -16,10 +16,27 @@ export const getMembers = async (): Promise<any> => {
     }
 }
 
+// // Lấy tất cả thành viên theo dongHoId (không phân trang - dùng cho render cây)
+// export const getMembersByDongHo = async (dongHoId: string): Promise<any> => {
+//     try {
+//         const res = await apiClient.get(`${prefix}/dongho/${dongHoId}/all`);
+//         return res?.data;
+//     } catch (error: any) {
+//         const err = parseApiError(error);
+//         // Không log 403 error - đây là lỗi quyền truy cập, xử lý gracefully
+//         const is403 = error?.response?.status === 403;
+//         if (!is403) {
+//             console.error(`[getMembersByDongHo] ${err.message}`);
+//         }
+//         return { success: false, data: [], message: err.message, is403 };
+//     }
+// }
+
 // Lấy tất cả thành viên theo dongHoId (không phân trang - dùng cho render cây)
-export const getMembersByDongHo = async (dongHoId: string): Promise<any> => {
+export const getMembersByDongHo = async (dongHoId: string, maxGen?: number): Promise<any> => {
     try {
-        const res = await apiClient.get(`${prefix}/dongho/${dongHoId}/all`);
+        const url = `${prefix}/dongho/${dongHoId}/all${typeof maxGen === 'number' ? `?maxGen=${maxGen}` : ''}`;
+        const res = await apiClient.get(url);
         return res?.data;
     } catch (error: any) {
         const err = parseApiError(error);
@@ -189,4 +206,64 @@ export const importMembersJson = async (
         throw new Error(err.message);
     }
 }
+
+
+
+
+export const saveCoordinates = async (
+  dongHoId: string,
+  coordinates: Array<{ thanhVienId: number; toaDoX: number; toaDoY: number }>,
+): Promise<any> => {
+  try {
+    const res = await apiClient.post(`${prefix}/save-coordinates`, {
+      dongHoId,
+      coordinates,
+    });
+    return res?.data;
+  } catch (error: any) {
+    const err = parseApiError(error);
+    console.error(`[saveCoordinates] ${err.message}`);
+    throw new Error(err.message);
+  }
+};
+
+export const saveEdgeCoordinates = async (
+  dongHoId: string,
+  edgeCoordinates: Array<{
+    edgeId: string;
+    bendX?: number | null;
+    bendY?: number | null;
+    dx?: number | null;
+    dy?: number | null;
+    cp1x?: number | null;
+    cp1y?: number | null;
+    cp2x?: number | null;
+    cp2y?: number | null;
+  }>,
+): Promise<any> => {
+  try {
+    const res = await apiClient.post(`${prefix}/save-edge-coordinates`, {
+      dongHoId,
+      edgeCoordinates,
+    });
+    return res?.data;
+  } catch (error: any) {
+    const err = parseApiError(error);
+    console.error(`[saveEdgeCoordinates] ${err.message}`);
+    throw new Error(err.message);
+  }
+};
+
+export const loadEdgeCoordinates = async (dongHoId: string): Promise<any> => {
+  try {
+    const res = await apiClient.get(
+      `${prefix}/load-edge-coordinates/${dongHoId}`,
+    );
+    return res?.data;
+  } catch (error: any) {
+    const err = parseApiError(error);
+    console.error(`[loadEdgeCoordinates] ${err.message}`);
+    return { success: false, data: [], message: err.message };
+  }
+};
 
