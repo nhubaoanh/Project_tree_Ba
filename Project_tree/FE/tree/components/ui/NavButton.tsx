@@ -22,7 +22,7 @@ export const NavButton: React.FC<NavButtonProps> = ({
         willChange: "transform", // Optimize for animations
       }}
       className={`
-        relative px-6 py-6 font-bold uppercase tracking-wide cursor-pointer
+        relative px-6 py-6 font-bold tracking-wide cursor-pointer
         transform transition-transform duration-200 ease-out
         hover:scale-102 active:scale-98
         ${

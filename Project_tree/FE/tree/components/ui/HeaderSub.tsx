@@ -6,7 +6,6 @@ import { LogOut, User, ChevronDown, ChevronUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import storage from "@/utils/storage";
 
-
 interface HeaderProps {
   activeView: string;
   onNavigate: (view: ViewMode) => void;
@@ -50,9 +49,9 @@ export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
   const navItems = [
     { key: ViewMode.PHA_KY, label: "Phả Ký" },
     { key: ViewMode.DIAGRAM, label: "Phả Đồ" },
+    { key: ViewMode.Walet, label: "Đóng góp" },
     { key: ViewMode.EVENT, label: "Sự Kiện" },
     { key: ViewMode.NEWS, label: "Tin Tức" },
-    { key: ViewMode.Walet, label: "Đóng góp" },
   ];
 
   return (
@@ -120,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
                   quality={80}
                 />
               </div>
-              <nav className="flex flex-wrap justify-center text-[17px] items-center gap-3 md:gap-4 w-full absolute bottom-2 z-20">
+              <nav className="flex flex-wrap justify-center text-[19`px] items-center gap-3 md:gap-4 w-full absolute bottom-2 z-20">
                 {navItems.map((item) => (
                   <NavButton
                     key={item.key}
