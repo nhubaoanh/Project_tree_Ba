@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Tắt static export để hỗ trợ dynamic routes
-  // output: "export",
+  // Static export để deploy lên hosting HTML tĩnh
+  output: "export",
   
   // Thêm trailing slash để fix routing issues
   trailingSlash: true,
