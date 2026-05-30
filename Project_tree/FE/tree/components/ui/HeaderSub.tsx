@@ -119,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
                   quality={80}
                 />
               </div>
-              <nav className="flex flex-wrap justify-center text-[19`px] items-center gap-3 md:gap-4 w-full absolute bottom-2 z-20">
+              <nav className="flex flex-wrap justify-center text-[20px] items-center gap-3 md:gap-4 w-full absolute bottom-2 z-20">
                 {navItems.map((item) => (
                   <NavButton
                     key={item.key}

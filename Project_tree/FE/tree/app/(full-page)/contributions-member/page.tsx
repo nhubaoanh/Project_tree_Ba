@@ -8,8 +8,6 @@ import {
   Plus,
   Search,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { getContributionsByDongHo } from "@/service/contribution.service";
 import storage from "@/utils/storage";
 import { useToast } from "@/service/useToas";
 import { PaymentMethodModal } from "./components/PaymentMethodModal";
@@ -62,20 +60,171 @@ export default function ContributionsPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  const { data: contributions, isLoading } = useQuery<
-    BankTransactionResponse,
-    Error
-  >({
-    queryKey: ["contributions", dongHoId, currentPage, pageSize, statusFilter],
-    queryFn: () =>
-      getContributionsByDongHo(
-        dongHoId || "",
-        currentPage,
-        pageSize,
-        statusFilter,
-      ),
-    enabled: !!dongHoId,
-  });
+  // Demo data cứng
+  const mockContributions: BankTransactionResponse = {
+    data: [
+      {
+        bankTransactionId: "TXN001",
+        tenTaiKhoanChuyen: "Nguyễn Văn A",
+        ngayChuyenKhoan: "2024-01-15",
+        soTien: 5000000,
+        phuongThucThanhToan: "bank_transfer",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ - Tết 2024",
+        maGiaoDichNganHang: "GD20240115001",
+      },
+      {
+        bankTransactionId: "TXN002",
+        tenTaiKhoanChuyen: "Trần Thị B",
+        ngayChuyenKhoan: "2024-02-10",
+        soTien: 3000000,
+        phuongThucThanhToan: "vnpay",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240210002",
+      },
+      {
+        bankTransactionId: "TXN003",
+        tenTaiKhoanChuyen: "Phạm Minh C",
+        ngayChuyenKhoan: "2024-03-05",
+        soTien: 2500000,
+        phuongThucThanhToan: "momo",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240305003",
+      },
+      {
+        bankTransactionId: "TXN004",
+        tenTaiKhoanChuyen: "Lê Hoàng D",
+        ngayChuyenKhoan: "2024-03-20",
+        soTien: 4000000,
+        phuongThucThanhToan: "bank_transfer",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ - Tháng 3",
+        maGiaoDichNganHang: "GD20240320004",
+      },
+      {
+        bankTransactionId: "TXN005",
+        tenTaiKhoanChuyen: "Võ Thị E",
+        ngayChuyenKhoan: "2024-04-12",
+        soTien: 2000000,
+        phuongThucThanhToan: "vnpay",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240412005",
+      },
+      {
+        bankTransactionId: "TXN006",
+        tenTaiKhoanChuyen: "Hoàng Quý F",
+        ngayChuyenKhoan: "2024-05-01",
+        soTien: 3500000,
+        phuongThucThanhToan: "bank_transfer",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ - Tháng 5",
+        maGiaoDichNganHang: "GD20240501006",
+      },
+      {
+        bankTransactionId: "TXN007",
+        tenTaiKhoanChuyen: "Đặng Văn G",
+        ngayChuyenKhoan: "2024-05-15",
+        soTien: 2750000,
+        phuongThucThanhToan: "momo",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240515007",
+      },
+      {
+        bankTransactionId: "TXN008",
+        tenTaiKhoanChuyen: "Lâm Thị H",
+        ngayChuyenKhoan: "2024-06-02",
+        soTien: 4500000,
+        phuongThucThanhToan: "vnpay",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240602008",
+      },
+      {
+        bankTransactionId: "TXN009",
+        tenTaiKhoanChuyen: "Tạ Quốc I",
+        ngayChuyenKhoan: "2024-06-18",
+        soTien: 2200000,
+        phuongThucThanhToan: "bank_transfer",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240618009",
+      },
+      {
+        bankTransactionId: "TXN010",
+        tenTaiKhoanChuyen: "Cao Thị J",
+        ngayChuyenKhoan: "2024-07-05",
+        soTien: 3800000,
+        phuongThucThanhToan: "momo",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240705010",
+      },
+      {
+        bankTransactionId: "TXN011",
+        tenTaiKhoanChuyen: "Phạm Minh K",
+        ngayChuyenKhoan: "2024-07-22",
+        soTien: 2900000,
+        phuongThucThanhToan: "vnpay",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240722011",
+      },
+      {
+        bankTransactionId: "TXN012",
+        tenTaiKhoanChuyen: "Trương Văn L",
+        ngayChuyenKhoan: "2024-08-10",
+        soTien: 4100000,
+        phuongThucThanhToan: "bank_transfer",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240810012",
+      },
+      {
+        bankTransactionId: "TXN013",
+        tenTaiKhoanChuyen: "Phan Thị M",
+        ngayChuyenKhoan: "2024-08-25",
+        soTien: 2600000,
+        phuongThucThanhToan: "momo",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240825013",
+      },
+      {
+        bankTransactionId: "TXN014",
+        tenTaiKhoanChuyen: "Vũ Quang N",
+        ngayChuyenKhoan: "2024-09-08",
+        soTien: 3300000,
+        phuongThucThanhToan: "vnpay",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240908014",
+      },
+      {
+        bankTransactionId: "TXN015",
+        tenTaiKhoanChuyen: "Dương Thị O",
+        ngayChuyenKhoan: "2024-09-20",
+        soTien: 4800000,
+        phuongThucThanhToan: "bank_transfer",
+        trangThai: "verified",
+        noiDungChuyenKhoan: "Đóng góp quỹ dòng họ",
+        maGiaoDichNganHang: "GD20240920015",
+      },
+    ],
+    pagination: {
+      pageIndex: 1,
+      pageSize: 15,
+      total: 15,
+      totalPages: 1,
+    },
+  };
+
+  // Sử dụng dữ liệu cứng thay vì useQuery
+  const contributions = mockContributions;
+  const isLoading = false;
 
   const transactions = Array.isArray(contributions?.data)
     ? contributions.data

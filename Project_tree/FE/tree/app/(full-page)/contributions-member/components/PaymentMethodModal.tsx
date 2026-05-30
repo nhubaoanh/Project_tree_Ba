@@ -80,9 +80,9 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#fffdf5] w-full max-w-2xl rounded-lg shadow-2xl border border-[#d4af37] overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="bg-[#b91c1c] text-yellow-400 px-6 py-4 flex justify-between items-center">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-[#fffdf5] w-full max-w-2xl rounded-lg shadow-2xl border border-[#d4af37] overflow-hidden flex flex-col max-h-[95vh]">
+        <div className="bg-[#b91c1c] text-yellow-400 px-6 py-4 flex justify-between items-center flex-shrink-0">
           <h3 className="text-xl font-bold uppercase flex items-center gap-2">
             <Wallet size={24} /> Đóng Quỹ
           </h3>
@@ -98,7 +98,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
         <form
           id="paymentForm"
           onSubmit={handleSubmit}
-          className="p-6 overflow-y-auto space-y-6"
+          className="p-6 overflow-y-auto flex-1 space-y-6"
         >
           <div className="space-y-2">
             <label className="text-sm font-bold text-[#8b5e3c] uppercase">
@@ -178,7 +178,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
           </div>
         </form>
 
-        <div className="p-4 bg-[#fdf6e3] border-t border-[#d4af37]/30 flex justify-end gap-3">
+        <div className="p-4 bg-[#fdf6e3] border-t border-[#d4af37]/30 flex justify-end gap-3 flex-shrink-0">
           <button
             type="button"
             onClick={onClose}
