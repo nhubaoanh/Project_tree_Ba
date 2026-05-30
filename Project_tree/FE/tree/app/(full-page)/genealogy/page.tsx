@@ -15,6 +15,7 @@ import SuKienPage from "../events/page";
 import storage from "@/utils/storage";
 import { AIChatBox } from "@/components/shared/AIChatBox";
 import FamilyTreeCanvasGiaPha from "@/components/ui/tree/treeCanvasGiaPha";
+import ContributionsMemberPage from "../contributions-member/page";
 
 // Loading component
 function GenealogyLoading() {
@@ -530,7 +531,8 @@ function GenealogyContent() {
           )}
 
           {activeView === ViewMode.Walet && (
-            <DonationPage />
+            // <DonationPage />
+            <ContributionsMemberPage />
           )}
         </div>
 
