@@ -80,7 +80,9 @@ export const TreeControls = memo(({
 
             {/* Search */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Tìm kiếm:</label>
+              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                Tìm kiếm:
+              </label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Input
@@ -89,7 +91,7 @@ export const TreeControls = memo(({
                     value={search}
                     onChange={(e) => onSearch(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         e.preventDefault();
                         onPerformSearch();
                       }
@@ -102,7 +104,7 @@ export const TreeControls = memo(({
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        onSearch('');
+                        onSearch("");
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 active:scale-90 transition-all"
                       title="Xóa"
@@ -130,14 +132,44 @@ export const TreeControls = memo(({
               </div>
             </div>
 
+            {/* Generation Filter */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                Hiển thị đến đời:
+              </label>
+              <Select
+                value={maxGen.toString()}
+                onValueChange={(v) => setMaxGen(Number(v))}
+              >
+                <SelectTrigger className="h-11 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 active:scale-95 transition-all">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="dark:bg-gray-800 dark:border-gray-600 bg-white/95 backdrop-blur">
+                  {gens.map((g) => (
+                    <SelectItem
+                      key={g}
+                      value={g.toString()}
+                      className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700 cursor-pointer h-10"
+                    >
+                      Đời {g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Tree View Mode Toggle */}
             {onTreeViewModeChange && treeViewMode && (
               <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Chế độ xem:</label>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  Chế độ xem:
+                </label>
                 <div className="flex gap-2">
                   <Button
                     onClick={() => onTreeViewModeChange("standard")}
-                    variant={treeViewMode === "standard" ? "default" : "outline"}
+                    variant={
+                      treeViewMode === "standard" ? "default" : "outline"
+                    }
                     size="sm"
                     className={`flex-1 h-11 ${
                       treeViewMode === "standard"
@@ -167,27 +199,6 @@ export const TreeControls = memo(({
               </div>
             )}
 
-            {/* Generation Filter */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Hiển thị đến đời:</label>
-              <Select value={maxGen.toString()} onValueChange={(v) => setMaxGen(Number(v))}>
-                <SelectTrigger className="h-11 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 active:scale-95 transition-all">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="dark:bg-gray-800 dark:border-gray-600 bg-white/95 backdrop-blur">
-                  {gens.map((g) => (
-                    <SelectItem 
-                      key={g} 
-                      value={g.toString()}
-                      className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700 cursor-pointer h-10"
-                    >
-                      Đời {g}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Refresh Button */}
             {onRefresh && (
               <Button
@@ -202,14 +213,14 @@ export const TreeControls = memo(({
             )}
 
             {/* Add Member Button */}
-            <Button
+            {/* <Button
               onClick={onAddMember}
               variant="default"
               size="sm"
               className="w-full h-11 bg-gradient-to-r from-red-800 to-red-600 hover:from-red-900 hover:to-red-700 text-white active:scale-95 transition-all hover:shadow-lg"
             >
               Thêm thành viên
-            </Button>
+            </Button> */}
           </div>
         </Panel>
       ) : (
@@ -230,7 +241,9 @@ export const TreeControls = memo(({
           <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-lg shadow-lg border border-red-400 dark:border-red-600 p-2 space-y-2">
             {/* Close button */}
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Công cụ</span>
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Công cụ
+              </span>
               <button
                 onClick={() => setShowRightPanel(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
@@ -248,8 +261,12 @@ export const TreeControls = memo(({
               className="w-full active:scale-95 transition-all"
               title="Chế độ tối"
             >
-              {darkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
-              {darkMode ? 'Sáng' : 'Tối'}
+              {darkMode ? (
+                <Sun className="h-4 w-4 mr-2" />
+              ) : (
+                <Moon className="h-4 w-4 mr-2" />
+              )}
+              {darkMode ? "Sáng" : "Tối"}
             </Button>
 
             {/* Print Button */}
@@ -332,7 +349,7 @@ export const TreeControls = memo(({
                 Đã mất
               </span>
             </div>
-            
+
             {/* Quan hệ */}
             <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex gap-4 text-xs dark:text-gray-300">
               <span className="flex items-center gap-1.5">
