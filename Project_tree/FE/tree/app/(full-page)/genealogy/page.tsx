@@ -531,8 +531,9 @@ function GenealogyContent() {
           )}
 
           {activeView === ViewMode.Walet && (
-            // <DonationPage />
-            <ContributionsMemberPage />
+            <div className="w-full h-full overflow-y-auto">
+              <ContributionsMemberPage />
+            </div>
           )}
         </div>
 
